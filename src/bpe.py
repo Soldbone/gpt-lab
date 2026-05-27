@@ -89,6 +89,7 @@ class BPETokenizer:
         - 새 token ID를 만들고, 시퀀스의 해당 pair를 새 ID로 치환합니다.
         - `self.merges`, `self.id_to_token`, `self.token_to_id`를 갱신합니다.
         """
+   
         if len(corpus) == 0:
             return 
 
@@ -97,31 +98,40 @@ class BPETokenizer:
 
         for i in range(len(corpus)): 
             char_list.append(corpus[i].encode("utf-8"))
-        
-        j = 0 
 
         # loop 횟수가 vocab_size를 넘어가거나 
-        while j < self.vocab_size: 
+        while len(self.token_to_id) < self.vocab_size: 
             char_dict = Counter()
+            temp_list = [] 
 
             for i in range(len(char_list)-1): 
-                added_bytes = char_list[i] + char_list[i+1] 
+                added_bytes = char_list[i] + char_list[i+1]                
                 char_dict[added_bytes] = char_dict.get(added_bytes, 0) + 1  
-            
+
             tokens = char_dict.most_common()                        
           
             token_id = len(self.token_to_id)
             most_common_token = tokens[0][0]
+
+            # counting 2 이상인 토큰이 없을때        
+            if tokens[0][1] < 2: 
+                break 
             
             self.token_to_id[most_common_token] = token_id 
             self.id_to_token[token_id] = most_common_token 
-            # counting 2 이상인 토큰이 없을때 
-            if tokens[0][1] < 2: 
-                break 
 
-            j += 1          
-        
-        
+            for i in range(len(char_list)-1): 
+                added_bytes = char_list[i] + char_list[i+1]
+                if added_bytes == most_common_token: 
+                    temp_list.append(added_bytes)
+                else: 
+                    temp_list.append(char_list[i]) 
+            
+            if char_list[-1] + char_list[-2] != most_common_token: 
+                temp_list.append(char_list[-1])
+
+            char_list = temp_list 
+
         self.merges = char_dict.keys()
  
         # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
