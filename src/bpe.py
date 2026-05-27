@@ -8,7 +8,7 @@ UTF-8 byte-level BPE 토크나이저 과제 템플릿.
 """
 
 from pathlib import Path
-
+from collections import Counter, defaultdict 
 
 PAD_TOKEN = "<pad>"
 UNK_TOKEN = "<unk>"
@@ -36,6 +36,7 @@ class BPETokenizer:
         self.id_to_token = {}
         self.token_to_id = {}
         self.merges = []
+        self._init_special_tokens()
 
     def _init_special_tokens(self):
         """
@@ -59,7 +60,7 @@ class BPETokenizer:
         for i in range(BYTE_OFFSET, NUM_BYTES + BYTE_OFFSET): 
             self.id_to_token[i] = bytes([i - BYTE_OFFSET])
             self.token_to_id[bytes([i - BYTE_OFFSET])] = self.id_to_token[i] 
-        
+
         # raise NotImplementedError("_init_special_tokens를 구현하세요.")
 
     def get_pad_id(self):
@@ -88,7 +89,41 @@ class BPETokenizer:
         - 새 token ID를 만들고, 시퀀스의 해당 pair를 새 ID로 치환합니다.
         - `self.merges`, `self.id_to_token`, `self.token_to_id`를 갱신합니다.
         """
-        print(corpus)
+        if len(corpus) == 0:
+            return 
+
+        char_list = []
+        char_dict = Counter()
+
+        for i in range(len(corpus)): 
+            char_list.append(corpus[i].encode("utf-8"))
+        
+        j = 0 
+
+        # loop 횟수가 vocab_size를 넘어가거나 
+        while j < self.vocab_size: 
+            char_dict = Counter()
+
+            for i in range(len(char_list)-1): 
+                added_bytes = char_list[i] + char_list[i+1] 
+                char_dict[added_bytes] = char_dict.get(added_bytes, 0) + 1  
+            
+            tokens = char_dict.most_common()                        
+          
+            token_id = len(self.token_to_id)
+            most_common_token = tokens[0][0]
+            
+            self.token_to_id[most_common_token] = token_id 
+            self.id_to_token[token_id] = most_common_token 
+            # counting 2 이상인 토큰이 없을때 
+            if tokens[0][1] < 2: 
+                break 
+
+            j += 1          
+        
+        
+        self.merges = char_dict.keys()
+ 
         # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
 
     def save(self, path: str | Path):
