@@ -9,6 +9,7 @@ UTF-8 byte-level BPE 토크나이저 과제 템플릿.
 
 from pathlib import Path
 from collections import Counter, defaultdict 
+import json
 
 PAD_TOKEN = "<pad>"
 UNK_TOKEN = "<unk>"
@@ -139,16 +140,28 @@ class BPETokenizer:
     def save(self, path: str | Path):
         """
         TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
-
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
-        raise NotImplementedError("BPETokenizer.save를 구현하세요.")
+        #print("이현성\n\n\n\n\n\n ")
+        with open("vocabulary.json", "w", encoding="utf-8") as f:
+            json.dump([str(key) for key, _ in self.token_to_id.items()], f, ensure_ascii=False, indent=2)
+        #print(f"{len(self.token_to_id)}\n\n\n\n")
+        with open("merge_rule.json", "w", encoding="utf-8") as f:
+            json.dump(self.merges, f, ensure_ascii=False, indent=2)
+        #print("이현성2\n\n\n\n\n\n ")
+        #raise NotImplementedError("BPETokenizer.save를 구현하세요.")
 
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
-        raise NotImplementedError("BPETokenizer.load를 구현하세요.")
+        with open("vocabulary.json", "r", encoding="utf-8") as f:
+            self.token_to_id = json.load(f)
+        
+        with open("merge_rule.json", "r", encoding="utf-8") as f:
+            self.merges = json.load(f) 
+        self.merges = [tuple(pair) for pair in self.merges]
+        #raise NotImplementedError("BPETokenizer.load를 구현하세요.")
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
         """
