@@ -118,6 +118,7 @@ class BPETokenizer:
             if tokens[0][1] < 2: 
                 break 
             
+            self.merges.append(most_common_token)
             self.token_to_id[most_common_token] = token_id 
             self.id_to_token[token_id] = most_common_token 
 
@@ -133,7 +134,6 @@ class BPETokenizer:
 
             char_list = temp_list 
 
-        self.merges = char_dict.keys()
  
         # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
 
