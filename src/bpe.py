@@ -60,8 +60,8 @@ class BPETokenizer:
         # 0~255는 추후에 개별 단어로 매핑 
         for i in range(BYTE_OFFSET, NUM_BYTES + BYTE_OFFSET): 
             self.id_to_token[i] = bytes([i - BYTE_OFFSET])
-            self.token_to_id[bytes([i - BYTE_OFFSET])] = self.id_to_token[i] 
-
+            self.token_to_id[bytes([i - BYTE_OFFSET])] = i 
+    
         # raise NotImplementedError("_init_special_tokens를 구현하세요.")
 
     def get_pad_id(self):
@@ -177,12 +177,10 @@ class BPETokenizer:
 
         if add_bos_eos:
             byte_list.append(self.token_to_id[BOS_TOKEN])
+      
+        char_list = text.encode("utf-8")
+       
 
-        char_list = []
-
-        for i in range(len(text)): 
-            char_list.append(text[i].encode("utf-8"))
-        
         # merge
         for i in range(len(char_list)):
             """ 텍스트를 차례로 순회
@@ -191,24 +189,33 @@ class BPETokenizer:
             ...
             들어 있지 않으면 byte_list.append(이전 단어)
             i += 1 하고 반복 """
+            prev = bytes([char_list[i]])
+            
+            for j in range(i+1, len(char_list)):                 
+                word = char_list[i:j]
+                
+                if word in self.merges: 
+                    prev = word 
+                else:                   
+                    byte_list.append(self.token_to_id[prev])
+                    break             
+            
+        byte_list.append(self.token_to_id[bytes([char_list[-1]])])
 
-            j = i + 1
-            prev = char_list[i]
-            while j < len(char_list):
-                # TODO: curr도 한 바이트씩 순회해야 함
-                curr = char_list[i:j]
-                if curr in self.merges:
-                    prev = curr
-                else:
-                    break
-                j += 1
-
-            byte_list.append(self.token_to_id[prev])
-            # byte_list.append(self.token_to_id[text[i].encode("utf-8")])
-        
         if add_bos_eos:
             byte_list.append(self.token_to_id[EOS_TOKEN])
+
         # TODO: merges 를 대상으로 얻은 토큰 리스트 반환
+        b_bytes = b""
+
+        for i in range(len(byte_list) - 1):             
+            if byte_list[i] >= 4: 
+                b_bytes += self.id_to_token[byte_list[i]]
+        # print(f"byte_list: {b_bytes}\n\n\n")
+        
+
+        
+        # raise NotImplementedError("BPETokenizer.load를 구현하세요.")
         return byte_list
 
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
@@ -218,5 +225,11 @@ class BPETokenizer:
         주의:
         - merge token은 원본 byte token까지 재귀적으로 펼칩니다.
         - byte를 하나씩 decode하지 말고, 마지막에 `bytes(...).decode("utf-8")`를 한 번만 호출합니다.
-        """
-        raise NotImplementedError("BPETokenizer.decode를 구현하세요.")
+        """        
+
+        b_bytes = b""
+        for i in range(len(ids) - 1):             
+            if ids[i] >= 4: 
+                b_bytes += self.id_to_token[ids[i]]
+        return b_bytes.decode("utf-8")
+    
