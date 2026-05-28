@@ -178,10 +178,9 @@ class BPETokenizer:
         if add_bos_eos:
             byte_list.append(self.token_to_id[BOS_TOKEN])
       
-        char_list = text.encode("utf-8")
-       
-
+        char_list = text.encode("utf-8") 
         # merge
+        count = 0
         for i in range(len(char_list)):
             """ 텍스트를 차례로 순회
             1(i)번째 바이트가 merges에 들어 있는지 확인 (변수에 백업)
@@ -189,18 +188,22 @@ class BPETokenizer:
             ...
             들어 있지 않으면 byte_list.append(이전 단어)
             i += 1 하고 반복 """
+            if count > 0:
+                count -= 1
+                continue
+
             prev = bytes([char_list[i]])
-            
-            for j in range(i+1, len(char_list)):                 
+
+            for j in range(i+1, len(char_list)):
+
                 word = char_list[i:j]
-                
                 if word in self.merges: 
                     prev = word 
+                    count += 1
                 else:                   
-                    byte_list.append(self.token_to_id[prev])
                     break             
-            
-        byte_list.append(self.token_to_id[bytes([char_list[-1]])])
+            byte_list.append(self.token_to_id[prev])
+        #byte_list.append(self.token_to_id[bytes([char_list[-1]])])
 
         if add_bos_eos:
             byte_list.append(self.token_to_id[EOS_TOKEN])
@@ -212,8 +215,6 @@ class BPETokenizer:
             if byte_list[i] >= 4: 
                 b_bytes += self.id_to_token[byte_list[i]]
         # print(f"byte_list: {b_bytes}\n\n\n")
-        
-
         
         # raise NotImplementedError("BPETokenizer.load를 구현하세요.")
         return byte_list
@@ -228,8 +229,10 @@ class BPETokenizer:
         """        
 
         b_bytes = b""
-        for i in range(len(ids) - 1):             
+        for i in range(len(ids)):
             if ids[i] >= 4: 
                 b_bytes += self.id_to_token[ids[i]]
+            elif not skip_special:
+                b_bytes += self.id_to_token[ids[i]].encode("utf-8")
         return b_bytes.decode("utf-8")
     
