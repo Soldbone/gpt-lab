@@ -192,7 +192,7 @@ class BPETokenizer:
 
         encoded_list = text.encode("utf-8")
         # merge
-        count = 0
+        have_to_jump = False #머지됐을때 넘어갈 플래그
         for i in range(len(encoded_list)):
             """ 텍스트를 차례로 순회
             1(i)번째 바이트가 merges에 들어 있는지 확인 (변수에 백업)
@@ -200,18 +200,18 @@ class BPETokenizer:
             ...
             들어 있지 않으면 id_list.append(이전 단어)
             i += 1 하고 반복 """
-            if count > 0:
-                count -= 1
+            
+            if have_to_jump:
+                have_to_jump = False
                 continue
-
+            
             prev = bytes([encoded_list[i]])
 
-            for j in range(i+1, len(encoded_list)):
-
+            for j in range(i + 1, i + 2): #어차피 한칸 앞만 보니까 수정
                 word = encoded_list[i:j]
                 if word in self.merges:
                     prev = word
-                    count += 1
+                    have_to_jump = True
                 else:
                     break
             id_list.append(self.token_to_id[prev])
@@ -220,15 +220,6 @@ class BPETokenizer:
         if add_bos_eos:
             id_list.append(self.token_to_id[EOS_TOKEN])
 
-        # TODO: merges 를 대상으로 얻은 토큰 리스트 반환
-        b_bytes = b""
-
-        for i in range(len(id_list) - 1):
-            if id_list[i] >= 4:
-                b_bytes += self.id_to_token[id_list[i]]
-        # print(f"encoded_list: {b_bytes}\n\n\n")
-
-        # raise NotImplementedError("BPETokenizer.load를 구현하세요.")
         return id_list
     
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
