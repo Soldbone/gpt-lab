@@ -94,32 +94,40 @@ class BPETokenizer:
         if len(corpus) == 0:
             return 
 
-        char_list = []
-        char_dict = Counter()
+        char_list = [] #encoding된 변수들을 담을 임시 리스트
+        count_dict = Counter() #빈도수를 세는 딕셔너리
 
         for i in range(len(corpus)): 
             char_list.append(corpus[i].encode("utf-8"))
 
-        # loop 횟수가 vocab_size를 넘어가거나 
+        #사전에 추가로 등록을 계속 할건데,
+        #현재 사전에 등록된 토큰의 갯수가 사전 크기를 넘지 않을때까지
         while len(self.token_to_id) < self.vocab_size: 
-            char_dict = Counter()
+            count_dict = Counter()
             temp_list = [] 
 
             for i in range(len(char_list)-1): 
                 added_bytes = char_list[i] + char_list[i+1]                
-                char_dict[added_bytes] = char_dict.get(added_bytes, 0) + 1  
+                #added_bytes가 이미 딕셔너리에 있으면 기존 count에 1 더함.
+                #없으면 0으로 간주 후 1을 더해서 저장.
+                count_dict[added_bytes] = count_dict.get(added_bytes, 0) + 1  
 
-            tokens = char_dict.most_common()                        
-          
-            token_id = len(self.token_to_id)
+            #tokens에 가장 많이 나온 변수 삽입(튜플로)
+            tokens = count_dict.most_common()                        
+
+            #dict_size = 학습 사전의 크기
+            dict_size = len(self.token_to_id)
+            #most_common_token = 제일 많이 나온 토큰
             most_common_token = tokens[0][0]
 
             # counting 2 이상인 토큰이 없을때        
             if tokens[0][1] < 2: 
                 break 
             
-            self.token_to_id[most_common_token] = token_id 
-            self.id_to_token[token_id] = most_common_token 
+            #딕셔너리에 삽입
+            self.token_to_id[most_common_token] = dict_size 
+            self.id_to_token[dict_size] = most_common_token 
+
 
             for i in range(len(char_list)-1): 
                 added_bytes = char_list[i] + char_list[i+1]
@@ -133,8 +141,8 @@ class BPETokenizer:
 
             char_list = temp_list 
 
-        self.merges = char_dict.keys()
- 
+        self.merges = count_dict.keys()
+
         # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
 
     def save(self, path: str | Path):
