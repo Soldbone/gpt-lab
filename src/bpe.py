@@ -185,51 +185,51 @@ class BPETokenizer:
         - add_bos_eos=True이면 앞뒤에 bos/eos ID를 붙입니다.
         """
         # merges
-        encoded_list = []
+        id_list = []
 
         if add_bos_eos:
-            encoded_list.append(self.token_to_id[BOS_TOKEN])
+            id_list.append(self.token_to_id[BOS_TOKEN])
 
-        byte_list = text.encode("utf-8")
+        encoded_list = text.encode("utf-8")
         # merge
         count = 0
-        for i in range(len(byte_list)):
+        for i in range(len(encoded_list)):
             """ 텍스트를 차례로 순회
             1(i)번째 바이트가 merges에 들어 있는지 확인 (변수에 백업)
             1번째~2번째 바이트가 merges에 들어 있는지 확인
             ...
-            들어 있지 않으면 encoded_list.append(이전 단어)
+            들어 있지 않으면 id_list.append(이전 단어)
             i += 1 하고 반복 """
             if count > 0:
                 count -= 1
                 continue
 
-            prev = bytes([byte_list[i]])
+            prev = bytes([encoded_list[i]])
 
-            for j in range(i+1, len(byte_list)):
+            for j in range(i+1, len(encoded_list)):
 
-                word = byte_list[i:j]
+                word = encoded_list[i:j]
                 if word in self.merges:
                     prev = word
                     count += 1
                 else:
                     break
-            encoded_list.append(self.token_to_id[prev])
-        #encoded_list.append(self.token_to_id[bytes([byte_list[-1]])])
+            id_list.append(self.token_to_id[prev])
+        #encoded_list.append(self.token_to_id[bytes([encoded_list[-1]])])
 
         if add_bos_eos:
-            encoded_list.append(self.token_to_id[EOS_TOKEN])
+            id_list.append(self.token_to_id[EOS_TOKEN])
 
         # TODO: merges 를 대상으로 얻은 토큰 리스트 반환
         b_bytes = b""
 
-        for i in range(len(encoded_list) - 1):
-            if encoded_list[i] >= 4:
-                b_bytes += self.id_to_token[encoded_list[i]]
+        for i in range(len(id_list) - 1):
+            if id_list[i] >= 4:
+                b_bytes += self.id_to_token[id_list[i]]
         # print(f"encoded_list: {b_bytes}\n\n\n")
 
         # raise NotImplementedError("BPETokenizer.load를 구현하세요.")
-        return encoded_list
+        return id_list
     
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
         """
