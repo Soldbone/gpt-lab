@@ -16,9 +16,9 @@ UNK_TOKEN = "<unk>"
 BOS_TOKEN = "<bos>"
 EOS_TOKEN = "<eos>"
 
-SPECIAL_TOKENS = [PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN]
-SPECIAL_IDS = {token: idx for idx, token in enumerate(SPECIAL_TOKENS)}
-BYTE_OFFSET = len(SPECIAL_TOKENS)
+SPECIAL_most_TOKEN_tuple = [PAD_TOKEN, UNK_TOKEN, BOS_TOKEN, EOS_TOKEN]
+SPECIAL_IDS = {token: idx for idx, token in enumerate(SPECIAL_most_TOKEN_tuple)}
+BYTE_OFFSET = len(SPECIAL_most_TOKEN_tuple)
 NUM_BYTES = 256
 
 
@@ -60,8 +60,8 @@ class BPETokenizer:
         # 0~255는 추후에 개별 단어로 매핑 
         for i in range(BYTE_OFFSET, NUM_BYTES + BYTE_OFFSET): 
             self.id_to_token[i] = bytes([i - BYTE_OFFSET])
-            self.token_to_id[bytes([i - BYTE_OFFSET])] = self.id_to_token[i] 
-
+            self.token_to_id[bytes([i - BYTE_OFFSET])] = i 
+    
         # raise NotImplementedError("_init_special_tokens를 구현하세요.")
 
     def get_pad_id(self):
@@ -94,11 +94,11 @@ class BPETokenizer:
         if len(corpus) == 0:
             return 
 
-        char_list = [] #encoding된 변수들을 담을 임시 리스트
+        encoded_list = [] #encoding된 변수들을 담을 임시 리스트, 처음에 문자열로 오니까 byte로 인코딩해줌.
         count_dict = Counter() #빈도수를 세는 딕셔너리
 
         for i in range(len(corpus)): 
-            char_list.append(corpus[i].encode("utf-8"))
+            encoded_list.append(corpus[i].encode("utf-8"))
 
         #사전에 추가로 등록을 계속 할건데,
         #현재 사전에 등록된 토큰의 갯수가 사전 크기를 넘지 않을때까지
@@ -106,43 +106,45 @@ class BPETokenizer:
             count_dict = Counter()
             temp_list = [] 
 
-            for i in range(len(char_list)-1): 
-                added_bytes = char_list[i] + char_list[i+1]                
+            for i in range(len(encoded_list)-1): 
+                added_bytes = encoded_list[i] + encoded_list[i+1]                
                 #added_bytes가 이미 딕셔너리에 있으면 기존 count에 1 더함.
                 #없으면 0으로 간주 후 1을 더해서 저장.
                 count_dict[added_bytes] = count_dict.get(added_bytes, 0) + 1  
 
-            #tokens에 가장 많이 나온 변수 삽입(튜플로)
-            tokens = count_dict.most_common()                        
+            #most_token_tuple에 가장 많이 나온 변수 삽입(튜플로)
+            voca_most_tuple = count_dict.most_common()                        
 
-            #dict_size = 학습 사전의 크기
-            dict_size = len(self.token_to_id)
-            #most_common_token = 제일 많이 나온 토큰
-            most_common_token = tokens[0][0]
+            #voca_most_byte = 제일 많이 나온 토큰의 바이트.
+            voca_most_byte = voca_most_tuple[0][0]
 
             # counting 2 이상인 토큰이 없을때        
-            if tokens[0][1] < 2: 
+            if voca_most_tuple[0][1] < 2: 
                 break 
             
-            #딕셔너리에 삽입
-            self.token_to_id[most_common_token] = dict_size 
-            self.id_to_token[dict_size] = most_common_token 
+            self.merges.append(voca_most_byte) #제일 카운팅 많은 바이트 merge에 삽입
 
+            dict_size = len(self.token_to_id) #dict_size = 학습 사전의 "현재" 크기
+            #voca 확장. 제일 많이나온 바이트에 현재 dict_size삽입
+            self.token_to_id[voca_most_byte] = dict_size 
+            self.id_to_token[dict_size] = voca_most_byte 
 
-            for i in range(len(char_list)-1): 
-                added_bytes = char_list[i] + char_list[i+1]
-                if added_bytes == most_common_token: 
+            
+            #병합? 가장 많이나온 쌍을 합쳐서 저장?
+            for i in range(len(encoded_list)-1): 
+                added_bytes = encoded_list[i] + encoded_list[i+1]
+                if added_bytes == voca_most_byte: 
                     temp_list.append(added_bytes)
                 else: 
-                    temp_list.append(char_list[i]) 
+                    temp_list.append(encoded_list[i]) 
             
-            if char_list[-1] + char_list[-2] != most_common_token: 
-                temp_list.append(char_list[-1])
+            #제일 마지막은 안보니까 만약 병합 안된거면 삽입해줌.
+            if encoded_list[-1] + encoded_list[-2] != voca_most_byte: 
+                temp_list.append(encoded_list[-1])
 
-            char_list = temp_list 
+            encoded_list = temp_list 
 
-        self.merges = count_dict.keys()
-
+ 
         # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
 
     def save(self, path: str | Path):
@@ -150,22 +152,24 @@ class BPETokenizer:
         TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
-        #print("이현성\n\n\n\n\n\n ")
+
+        #학습사전을 세이브
         with open("vocabulary.json", "w", encoding="utf-8") as f:
             json.dump([str(key) for key, _ in self.token_to_id.items()], f, ensure_ascii=False, indent=2)
-        #print(f"{len(self.token_to_id)}\n\n\n\n")
+        #merge_rule을 세이브
         with open("merge_rule.json", "w", encoding="utf-8") as f:
             json.dump(self.merges, f, ensure_ascii=False, indent=2)
-        #print("이현성2\n\n\n\n\n\n ")
+
         #raise NotImplementedError("BPETokenizer.save를 구현하세요.")
 
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
+        #학습 사전 있던걸 로드.
         with open("vocabulary.json", "r", encoding="utf-8") as f:
             self.token_to_id = json.load(f)
-        
+        #merge_rule 있던걸 로드.
         with open("merge_rule.json", "r", encoding="utf-8") as f:
             self.merges = json.load(f) 
         self.merges = [tuple(pair) for pair in self.merges]
@@ -180,8 +184,53 @@ class BPETokenizer:
         - train/load에서 얻은 merge rule을 학습 순서대로 적용합니다.
         - add_bos_eos=True이면 앞뒤에 bos/eos ID를 붙입니다.
         """
-        raise NotImplementedError("BPETokenizer.encode를 구현하세요.")
+        # merges
+        encoded_list = []
 
+        if add_bos_eos:
+            encoded_list.append(self.token_to_id[BOS_TOKEN])
+
+        byte_list = text.encode("utf-8")
+        # merge
+        count = 0
+        for i in range(len(byte_list)):
+            """ 텍스트를 차례로 순회
+            1(i)번째 바이트가 merges에 들어 있는지 확인 (변수에 백업)
+            1번째~2번째 바이트가 merges에 들어 있는지 확인
+            ...
+            들어 있지 않으면 encoded_list.append(이전 단어)
+            i += 1 하고 반복 """
+            if count > 0:
+                count -= 1
+                continue
+
+            prev = bytes([byte_list[i]])
+
+            for j in range(i+1, len(byte_list)):
+
+                word = byte_list[i:j]
+                if word in self.merges:
+                    prev = word
+                    count += 1
+                else:
+                    break
+            encoded_list.append(self.token_to_id[prev])
+        #encoded_list.append(self.token_to_id[bytes([byte_list[-1]])])
+
+        if add_bos_eos:
+            encoded_list.append(self.token_to_id[EOS_TOKEN])
+
+        # TODO: merges 를 대상으로 얻은 토큰 리스트 반환
+        b_bytes = b""
+
+        for i in range(len(encoded_list) - 1):
+            if encoded_list[i] >= 4:
+                b_bytes += self.id_to_token[encoded_list[i]]
+        # print(f"encoded_list: {b_bytes}\n\n\n")
+
+        # raise NotImplementedError("BPETokenizer.load를 구현하세요.")
+        return encoded_list
+    
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
         """
         TODO: token ID 리스트를 문자열로 복원합니다.
@@ -189,5 +238,13 @@ class BPETokenizer:
         주의:
         - merge token은 원본 byte token까지 재귀적으로 펼칩니다.
         - byte를 하나씩 decode하지 말고, 마지막에 `bytes(...).decode("utf-8")`를 한 번만 호출합니다.
-        """
-        raise NotImplementedError("BPETokenizer.decode를 구현하세요.")
+        """        
+
+        b_bytes = b""
+        for i in range(len(ids)):
+            if ids[i] >= 4: 
+                b_bytes += self.id_to_token[ids[i]]
+            elif not skip_special:
+                b_bytes += self.id_to_token[ids[i]].encode("utf-8")
+        return b_bytes.decode("utf-8")
+    
