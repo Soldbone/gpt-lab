@@ -94,11 +94,8 @@ class BPETokenizer:
         if len(corpus) == 0:
             return 
 
-        encoded_list = [] #encoding된 변수들을 담을 임시 리스트, 처음에 문자열로 오니까 byte로 인코딩해줌.
+        encoded_list = corpus.encode("utf-8") #encoding된 변수들을 담을 임시 리스트, 처음에 문자열로 오니까 byte로 인코딩해줌.
         count_dict = Counter() #빈도수를 세는 딕셔너리
-
-        for i in range(len(corpus)): 
-            encoded_list.append(corpus[i].encode("utf-8"))
 
         #사전에 추가로 등록을 계속 할건데,
         #현재 사전에 등록된 토큰의 갯수가 사전 크기를 넘지 않을때까지
@@ -112,6 +109,9 @@ class BPETokenizer:
                 #없으면 0으로 간주 후 1을 더해서 저장.
                 count_dict[added_bytes] = count_dict.get(added_bytes, 0) + 1  
 
+            if not count_dict:
+                self.merges.append(encoded_list[0])
+                break
             #most_token_tuple에 가장 많이 나온 변수 삽입(튜플로)
             voca_most_tuple = count_dict.most_common()                        
 
@@ -129,17 +129,19 @@ class BPETokenizer:
             self.token_to_id[voca_most_byte] = dict_size 
             self.id_to_token[dict_size] = voca_most_byte 
 
-            
+            j = 0
             #병합? 가장 많이나온 쌍을 합쳐서 저장?
-            for i in range(len(encoded_list)-1): 
-                added_bytes = encoded_list[i] + encoded_list[i+1]
+            while j < len(encoded_list) - 1:
+                added_bytes = encoded_list[j] + encoded_list[j+1]
                 if added_bytes == voca_most_byte: 
                     temp_list.append(added_bytes)
+                    j += 2
                 else: 
-                    temp_list.append(encoded_list[i]) 
+                    temp_list.append(encoded_list[j]) 
+                    j += 1
             
             #제일 마지막은 안보니까 만약 병합 안된거면 삽입해줌.
-            if encoded_list[-1] + encoded_list[-2] != voca_most_byte: 
+            if encoded_list[-2] + encoded_list[-1] != voca_most_byte: 
                 temp_list.append(encoded_list[-1])
 
             encoded_list = temp_list 
@@ -152,25 +154,37 @@ class BPETokenizer:
         TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
+        
+        data = {
+            "id_to_token": {
+                str(idx): token_to_json(token)
+                for idx, token in self.id_to_token.items()
+            },
+            "merges": [
+                token_to_json(pair)
+                for pair in self.merges
+            ]
+        }
 
         #학습사전을 세이브
-        with open("vocabulary.json", "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump([str(key) for key, _ in self.token_to_id.items()], f, ensure_ascii=False, indent=2)
         #merge_rule을 세이브
-        with open("merge_rule.json", "w", encoding="utf-8") as f:
-            json.dump(self.merges, f, ensure_ascii=False, indent=2)
-
+        with open(path, "w", encoding="utf-8") as f:
+           json.dump(self.merges, f, ensure_ascii=False, indent=2)
+        
         #raise NotImplementedError("BPETokenizer.save를 구현하세요.")
 
     def load(self, path: str | Path):
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
+        
         #학습 사전 있던걸 로드.
-        with open("vocabulary.json", "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             self.token_to_id = json.load(f)
         #merge_rule 있던걸 로드.
-        with open("merge_rule.json", "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             self.merges = json.load(f) 
         self.merges = [tuple(pair) for pair in self.merges]
         #raise NotImplementedError("BPETokenizer.load를 구현하세요.")
@@ -190,9 +204,9 @@ class BPETokenizer:
         if add_bos_eos:
             id_list.append(self.token_to_id[BOS_TOKEN])
 
-        encoded_list = text.encode("utf-8")
+        encoded_list = [bytes([b]) for b in text.encode("utf-8")]
         # merge
-        have_to_jump = False #머지됐을때 넘어갈 플래그
+        count = 0
         for i in range(len(encoded_list)):
             """ 텍스트를 차례로 순회
             1(i)번째 바이트가 merges에 들어 있는지 확인 (변수에 백업)
@@ -201,19 +215,20 @@ class BPETokenizer:
             들어 있지 않으면 id_list.append(이전 단어)
             i += 1 하고 반복 """
             
-            if have_to_jump:
-                have_to_jump = False
+            if count > 0:
+                count -= 1
                 continue
             
             prev = bytes([encoded_list[i]])
+            count += 1
 
-            for j in range(i + 1, i + 2): #어차피 한칸 앞만 보니까 수정
-                word = encoded_list[i:j]
-                if word in self.merges:
-                    prev = word
-                    have_to_jump = True
-                else:
-                    break
+            for j in range(i+1, len(encoded_list) - 1):
+                word = encoded_list[i : j+1]
+                if word in self.merges: 
+                    prev = word 
+                    count += 1
+                else:                   
+                    break    
             id_list.append(self.token_to_id[prev])
         #encoded_list.append(self.token_to_id[bytes([encoded_list[-1]])])
 
