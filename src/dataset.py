@@ -52,10 +52,7 @@ class GPTDataset(Dataset):
             input_ids: (context_length,)
             target_ids: (context_length,)
         """
-        # idx번째 input_ids 가져오기 
-
-        return self.input_ids[idx], self.target_ids[idx]   
-
+        return self.input_ids[idx], self.target_ids[idx]
         # raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
 
 
