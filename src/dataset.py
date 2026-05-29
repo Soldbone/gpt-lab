@@ -17,6 +17,7 @@ class GPTDataset(Dataset):
     def __init__(
         self,
         token_ids: list[int],
+        
         context_length: int,
         stride: int | None = None,
     ):
