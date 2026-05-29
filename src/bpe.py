@@ -94,7 +94,9 @@ class BPETokenizer:
         if len(corpus) == 0:
             return 
 
-        encoded_list = corpus.encode("utf-8") #encoding된 변수들을 담을 임시 리스트, 처음에 문자열로 오니까 byte로 인코딩해줌.
+        #encoding된 변수들을 담을 임시 리스트, 처음에 문자열로 오니까 byte로 인코딩해줌.
+        encoded_list = [bytes([b]) for b in corpus.encode("utf-8")]
+
         count_dict = Counter() #빈도수를 세는 딕셔너리
 
         #사전에 추가로 등록을 계속 할건데,
@@ -104,7 +106,7 @@ class BPETokenizer:
             temp_list = [] 
 
             for i in range(len(encoded_list)-1): 
-                added_bytes = encoded_list[i] + encoded_list[i+1]                
+                added_bytes = encoded_list[i] + encoded_list[i+1]
                 #added_bytes가 이미 딕셔너리에 있으면 기존 count에 1 더함.
                 #없으면 0으로 간주 후 1을 더해서 저장.
                 count_dict[added_bytes] = count_dict.get(added_bytes, 0) + 1  
@@ -154,7 +156,15 @@ class BPETokenizer:
         TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
-        
+        #token to json
+        def token_to_json(token):
+            if isinstance(token, bytes):
+                return {"type": "bytes", "value": list(token)}
+            if isinstance(token, str):
+                return {"type": "str", "value": token}
+            if isinstance(token, tuple):
+                return {"type" : "tuple", "value": list(token)}
+
         data = {
             "id_to_token": {
                 str(idx): token_to_json(token)
@@ -166,12 +176,9 @@ class BPETokenizer:
             ]
         }
 
-        #학습사전을 세이브
+        #학습사전이랑 merge_rule 세이브
         with open(path, "w", encoding="utf-8") as f:
-            json.dump([str(key) for key, _ in self.token_to_id.items()], f, ensure_ascii=False, indent=2)
-        #merge_rule을 세이브
-        with open(path, "w", encoding="utf-8") as f:
-           json.dump(self.merges, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
         
         #raise NotImplementedError("BPETokenizer.save를 구현하세요.")
 
@@ -179,14 +186,33 @@ class BPETokenizer:
         """
         TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
+        def token_from_json(obj):
+            if obj["type"] == "bytes":
+                return bytes(obj["value"])
+            if obj["type"] == "str":
+                return obj["value"]
+            if obj["type"] == "tuple":
+                return tuple(obj["value"])
         
+        data = {}
         #학습 사전 있던걸 로드.
         with open(path, "r", encoding="utf-8") as f:
-            self.token_to_id = json.load(f)
-        #merge_rule 있던걸 로드.
-        with open(path, "r", encoding="utf-8") as f:
-            self.merges = json.load(f) 
-        self.merges = [tuple(pair) for pair in self.merges]
+            data = json.load(f)
+
+        self.id_to_token = {
+            int(idx): token_from_json(token)
+            for idx, token in data["id_to_token"].items()
+        }
+
+        self.token_to_id = {
+            token: idx
+            for idx, token in self.id_to_token.items()
+        }
+
+        self.merges = [
+            token_from_json(token)
+            for token in data["merges"]
+        ]
         #raise NotImplementedError("BPETokenizer.load를 구현하세요.")
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
@@ -204,7 +230,7 @@ class BPETokenizer:
         if add_bos_eos:
             id_list.append(self.token_to_id[BOS_TOKEN])
 
-        encoded_list = [bytes([b]) for b in text.encode("utf-8")]
+        encoded_list = text.encode("utf-8")
         # merge
         count = 0
         for i in range(len(encoded_list)):
@@ -220,18 +246,18 @@ class BPETokenizer:
                 continue
             
             prev = bytes([encoded_list[i]])
-            count += 1
+            print(f"prev: {prev}\n\n\n\n")
 
             for j in range(i+1, len(encoded_list) - 1):
-                word = encoded_list[i : j+1]
+                word = encoded_list[i : j + 1]
                 if word in self.merges: 
-                    prev = word 
+                    prev = word
                     count += 1
                 else:                   
-                    break    
+                    break
+            print(f"count: {count}\n\n\n\n")    
             id_list.append(self.token_to_id[prev])
-        #encoded_list.append(self.token_to_id[bytes([encoded_list[-1]])])
-
+            
         if add_bos_eos:
             id_list.append(self.token_to_id[EOS_TOKEN])
 
@@ -252,5 +278,6 @@ class BPETokenizer:
                 b_bytes += self.id_to_token[ids[i]]
             elif not skip_special:
                 b_bytes += self.id_to_token[ids[i]].encode("utf-8")
+        
+        print(f"b_bytes: {b_bytes}\n\n\n\n")
         return b_bytes.decode("utf-8")
-    
