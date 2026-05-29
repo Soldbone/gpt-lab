@@ -51,6 +51,7 @@ class GPTDataset(Dataset):
             input_ids: (context_length,)
             target_ids: (context_length,)
         """
+        return self.input_ids[idx], self.target_ids[idx]
         raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
 
 
