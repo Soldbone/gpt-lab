@@ -65,8 +65,8 @@ def create_dataloader(
     shuffle: bool = True,
     num_workers: int = 0,
 ) -> DataLoader:
-    dataset = GPTDataset(token_ids, context_length, stride)
-
+    """TODO: GPTDataset을 만들고 torch.utils.data.DataLoader로 감싸 반환합니다."""
+    dataset = GPTDataset(token_ids=token_ids, context_length=context_length, stride=stride)
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
