@@ -60,7 +60,7 @@ class BPETokenizer:
         # 0~255는 추후에 개별 단어로 매핑 
         for i in range(BYTE_OFFSET, NUM_BYTES + BYTE_OFFSET): 
             self.id_to_token[i] = bytes([i - BYTE_OFFSET])
-            self.token_to_id[bytes([i - BYTE_OFFSET])] = i 
+            self.token_to_id[bytes([i - BYTE_OFFSET])] = i
     
         # raise NotImplementedError("_init_special_tokens를 구현하세요.")
 
@@ -148,9 +148,6 @@ class BPETokenizer:
 
             encoded_list = temp_list 
 
- 
-        # raise NotImplementedError("BPETokenizer.train을 구현하세요.")
-
     def save(self, path: str | Path):
         """
         TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
@@ -179,8 +176,6 @@ class BPETokenizer:
         #학습사전이랑 merge_rule 세이브
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        
-        #raise NotImplementedError("BPETokenizer.save를 구현하세요.")
 
     def load(self, path: str | Path):
         """
@@ -213,7 +208,6 @@ class BPETokenizer:
             token_from_json(token)
             for token in data["merges"]
         ]
-        #raise NotImplementedError("BPETokenizer.load를 구현하세요.")
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
         """
@@ -246,7 +240,6 @@ class BPETokenizer:
                 continue
             
             prev = bytes([encoded_list[i]])
-            print(f"prev: {prev}\n\n\n\n")
 
             for j in range(i+1, len(encoded_list) - 1):
                 word = encoded_list[i : j + 1]
@@ -254,10 +247,9 @@ class BPETokenizer:
                     prev = word
                     count += 1
                 else:                   
-                    break
-            print(f"count: {count}\n\n\n\n")    
+                    break   
             id_list.append(self.token_to_id[prev])
-            
+
         if add_bos_eos:
             id_list.append(self.token_to_id[EOS_TOKEN])
 
@@ -279,5 +271,4 @@ class BPETokenizer:
             elif not skip_special:
                 b_bytes += self.id_to_token[ids[i]].encode("utf-8")
         
-        print(f"b_bytes: {b_bytes}\n\n\n\n")
         return b_bytes.decode("utf-8")
