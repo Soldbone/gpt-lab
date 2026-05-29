@@ -241,6 +241,7 @@ class BPETokenizer:
             
             prev = bytes([encoded_list[i]])
 
+            # TODO: count가 정확히 단어 끝까지 점프하도록 설정되는지 확인해봐야함
             for j in range(i+1, len(encoded_list) - 1):
                 word = encoded_list[i : j + 1]
                 if word in self.merges: 
