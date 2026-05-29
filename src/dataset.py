@@ -24,11 +24,23 @@ class GPTDataset(Dataset):
         self.token_ids = token_ids
         self.context_length = context_length
         self.stride = stride if stride is not None else context_length
+
+        self.input_ids = []
+        self.target_ids = []
+        
+        for i in range(0, len(token_ids) - context_length, self.stride):
+            input_chunk = token_ids[i:i + context_length]
+            target_chunk = token_ids[i + 1 : i + context_length + 1]
+            self.input_ids.append(torch.tensor(input_chunk))
+            self.target_ids.append(torch.tensor(target_chunk))
+
         # TODO: 만들 수 있는 학습 샘플 개수를 self._length에 저장하세요.
-        raise NotImplementedError("GPTDataset.__init__에서 self._length를 구현하세요.")
+        self._length = len(self.input_ids)
+        # raise NotImplementedError("GPTDataset.__init__에서 self._length를 구현하세요.")
 
     def __len__(self) -> int:
         """TODO: 전체 샘플 개수를 반환합니다."""
+        return len(self.input_ids)
         raise NotImplementedError("GPTDataset.__len__을 구현하세요.")
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
