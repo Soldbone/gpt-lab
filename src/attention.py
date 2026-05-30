@@ -16,7 +16,6 @@ class MultiHeadAttention(nn.Module):
     - causal mask로 미래 토큰 가리기
     - attention weight와 V를 곱한 뒤 head를 다시 합치기
     """
-
     def __init__(
         self,
         d_model: int,
@@ -31,7 +30,19 @@ class MultiHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.head_dim = d_model // n_heads
         # TODO: qkv projection, output projection, dropout을 정의하세요.
-        raise NotImplementedError("MultiHeadAttention.__init__을 구현하세요.")
+        self.W_query = nn.Linear(d_model, d_model, bias=qkv_bias)
+        self.W_key = nn.Linear(d_model, d_model, bias=qkv_bias)
+        self.W_value = nn.Linear(d_model, d_model, bias=qkv_bias)
+        self.out_proj = nn.Linear(d_model, d_model)
+        self.dropout = nn.Dropout(drop_rate)
+
+        self.register_buffer(
+            "mask",
+            torch.triu(torch.ones(self.d_model, self.d_model),
+                       diagonal=1)
+        )
+
+        # raise NotImplementedError("MultiHeadAttention.__init__을 구현하세요.")
 
     def forward(
         self,
@@ -47,4 +58,4 @@ class MultiHeadAttention(nn.Module):
             causal_mask: True이면 미래 위치를 볼 수 없게 mask 처리
             return_attention_weights: True이면 attention weight도 함께 반환
         """
-        raise NotImplementedError("MultiHeadAttention.forward를 구현하세요.")
+        # raise NotImplementedError("MultiHeadAttention.forward를 구현하세요.")
