@@ -58,4 +58,25 @@ class MultiHeadAttention(nn.Module):
             causal_mask: True이면 미래 위치를 볼 수 없게 mask 처리
             return_attention_weights: True이면 attention weight도 함께 반환
         """
+        b, num_tokens, d_in = x.shape
+        keys = self.W_key(x)
+        queries = self.W_query(x)
+        values = self.W_value(x)
+
+        keys = keys.view(b, num_tokens, self.n_heads, self.head_dim)
+        values = values.view(b, num_tokens, self.n_heads, self.head_dim)
+        queries = queries.view(b, num_tokens, self.n_heads, self.head_dim)
+
+        keys = keys.tranpose(1, 2)
+        values = values.tranpose(1, 2)
+        queries = queries.tranpose(1, 2)
+
+        attn_scores = queries @ keys.transpose(2, 3)
+        mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
+
+
+        if return_attention_weights:
+            return context_vec, attn_weights
+        else:
+            return context_vec
         # raise NotImplementedError("MultiHeadAttention.forward를 구현하세요.")
