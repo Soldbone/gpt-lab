@@ -45,6 +45,9 @@ class InputEmbedding(nn.Module):
         """ 
         _, seq_len = x.shape
 
+        if seq_len > self.context_length:
+            raise ValueError("[직접 만든 에러] seq_len exceeds context_length")
+
         token_embeddings = self.token_embedding_layer(x)
 
         positions = torch.arange(seq_len, device=x.device)
