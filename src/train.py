@@ -82,8 +82,8 @@ def load_checkpoint(
     """TODO: torch.load로 checkpoint를 읽어 model/optimizer 상태를 복원합니다."""
     checkpoint = torch.load(path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=0.1)
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    if optimizer is not None:
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     model.train()
     return checkpoint["epoch"], checkpoint["global_step"]
     #raise NotImplementedError("load_checkpoint를 구현하세요.")
@@ -125,7 +125,7 @@ def generate(
     #raise NotImplementedError("generate를 구현하세요.")
 
 def text_to_token_ids(text, tokenizer):
-    encoded = tokenizer.encode(text, allowed_special={'<|endoftext|>'})
+    encoded = tokenizer.encode(text)
     encoded_tensor = torch.tensor(encoded).unsqueeze(0)
     return encoded_tensor
 
@@ -187,10 +187,10 @@ def train_model(
     global_step: int = 0,
 ) -> list[float]:
     """TODO: 사전 학습 루프를 구현하고 epoch별 train loss 리스트를 반환합니다."""
-    train_losses, val_losses, track_token_seen = [], [], []
+    train_losses, val_losses= [], []
     tokens_seen = 0
 
-    for epoch in range(num_epochs):
+    for epoch in range(start_epoch, num_epochs):
         model.train()
         for input_batch, target_batch in train_loader:
             optimizer.zero_grad()
@@ -208,13 +208,15 @@ def train_model(
                 )
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
-                track_token_seen.append(tokens_seen)
                 print(f"에포크 {epoch+1} (Step {global_step:06d}): "
                       f"훈련 손실 {train_loss:.3f}, "
                       f"검증 손실 {val_loss:.3f}"
-                )
+                )  
+        if ckpt_freq is not None and epoch % ckpt_freq == 0:
+            path=f"checkpoint_step_{global_step}.pt"
+            save_checkpoint(model, optimizer, epoch, global_step, path)
         generate_and_print_sample(model, tokenizer, device, start_context)
-    return train_losses, val_losses, track_token_seen
+    return train_losses, val_losses
     #raise NotImplementedError("train_model을 구현하세요.")
 
 

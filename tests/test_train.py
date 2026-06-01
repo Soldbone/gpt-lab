@@ -153,7 +153,98 @@ class TestPlotLosses:
 
     def test_plot_losses_callable(self):
         """plot_losses()가 train/val loss 리스트를 받아 예외 없이 그래프를 그리는지 확인한다."""
+        import matplotlib.pyplot as plt
         from train import plot_losses
 
+        plt.close("all")
         plot_losses([0.5, 0.4, 0.3], [0.6, 0.5, 0.4])
-        # 시각화만 하므로 예외 없으면 통과
+
+        ax = plt.gca()
+        assert len(ax.lines) == 2
+        assert ax.get_xlabel() == "Epoch"
+        assert ax.get_ylabel() == "Loss"
+        assert ax.get_title() == "Training / Validation Loss"
+        assert [line.get_label() for line in ax.lines] == ["Train", "Val"]
+
+
+# =============================================================================
+# train_model
+# =============================================================================
+
+
+GPT_CONFIG_TINY = {
+    "vocab_size": 64,
+    "context_length": 8,
+    "emb_dim": 16,
+    "n_heads": 4,
+    "n_layers": 1,
+    "drop_rate": 0.0,
+    "qkv_bias": False,
+}
+
+
+class DummyTokenizer:
+    """Minimal tokenizer for train_model sample generation."""
+
+    def encode(self, text, allowed_special=None):
+        return [ord(ch) % GPT_CONFIG_TINY["vocab_size"] for ch in text]
+
+    def decode(self, token_ids):
+        return " ".join(str(token_id) for token_id in token_ids)
+
+
+class TestTrainModel:
+    """train_model training-loop tests."""
+
+    def test_train_model_returns_train_losses(self, monkeypatch):
+        from dataset import create_dataloader
+        from model import GPTModel
+        import train
+
+        monkeypatch.setattr(train, "generate_and_print_sample", lambda *args, **kwargs: None)
+
+        train_tokens = [i % GPT_CONFIG_TINY["vocab_size"] for i in range(80)]
+        val_tokens = [i % GPT_CONFIG_TINY["vocab_size"] for i in range(80, 120)]
+
+        train_loader = create_dataloader(
+            train_tokens,
+            context_length=GPT_CONFIG_TINY["context_length"],
+            batch_size=2,
+            shuffle=False,
+        )
+        val_loader = create_dataloader(
+            val_tokens,
+            context_length=GPT_CONFIG_TINY["context_length"],
+            batch_size=2,
+            shuffle=False,
+        )
+        model = GPTModel(GPT_CONFIG_TINY)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+
+        result = train.train_model(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            optimizer=optimizer,
+            device=torch.device("cpu"),
+            num_epochs=1,
+            eval_freq=1,
+            eval_iter=1,
+            start_context="hi",
+            tokenizer=DummyTokenizer(),
+        )
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        train_losses, val_losses = result
+        assert isinstance(train_losses, list)
+        assert isinstance(val_losses, list)
+        assert len(train_losses) > 0
+        assert len(val_losses) > 0
+        assert len(train_losses) == len(val_losses)
+        assert all(isinstance(loss, float) for loss in train_losses)
+        assert all(isinstance(loss, float) for loss in val_losses)
+        assert all(loss >= 0 for loss in train_losses)
+        assert all(loss >= 0 for loss in val_losses)
+
+        train.plot_losses(train_losses, val_losses)
