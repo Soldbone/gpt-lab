@@ -34,7 +34,23 @@ def calc_loss_loader(
     num_batches: int | None = None,
 ) -> float:
     """TODO: data_loader의 평균 loss를 계산합니다. 검증에서는 torch.no_grad()를 사용하세요."""
-    raise NotImplementedError("calc_loss_loader를 구현하세요.")
+    total_loss = 0
+    if len(data_loader) == 0:
+        return float("nan")
+    elif num_batches is None:
+        num_batches = len(data_loader)
+    else:
+        num_batches = min(num_batches, len(data_loader))
+    for i, (input_batch, target_batch) in enumerate(data_loader):
+        if i < num_batches:
+            loss = calc_loss_batch(
+                input_batch, target_batch, model, device
+            )
+            total_loss += loss.item()
+        else:
+            break
+    return total_loss / num_batches
+    #raise NotImplementedError("calc_loss_loader를 구현하세요.")
 
 
 def save_checkpoint(
