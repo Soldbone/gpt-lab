@@ -159,6 +159,17 @@ def generate_and_print_sample(
     model.train()
     #raise NotImplementedError("generate_and_print_sample을 구현하세요.")
 
+def evaluate_model(model, train_loader, val_loader, device, eval_iter):
+    model.eval()
+    with torch.no_grad():
+        train_loss = calc_loss_loader(
+            train_loader, model, device, num_batches=eval_iter
+        )
+        val_loss = calc_loss_loader(
+            val_loader, model, device, num_batches=eval_iter
+        )
+    model.train()
+    return train_loss, val_loss
 
 def train_model(
     model: GPTModel,
@@ -176,7 +187,35 @@ def train_model(
     global_step: int = 0,
 ) -> list[float]:
     """TODO: 사전 학습 루프를 구현하고 epoch별 train loss 리스트를 반환합니다."""
-    raise NotImplementedError("train_model을 구현하세요.")
+    train_losses, val_losses, track_token_seen = [], [], []
+    tokens_seen = 0
+
+    for epoch in range(num_epochs):
+        model.train()
+        for input_batch, target_batch in train_loader:
+            optimizer.zero_grad()
+            loss = calc_loss_batch(
+                input_batch, target_batch, model, device
+            )
+            loss.backward()
+            optimizer.step()
+            tokens_seen += input_batch.numel()
+            global_step += 1
+
+            if global_step % eval_freq == 0:
+                train_loss, val_loss = evaluate_model(
+                    model, train_loader, val_loader, device, eval_iter
+                )
+                train_losses.append(train_loss)
+                val_losses.append(val_loss)
+                track_token_seen.append(tokens_seen)
+                print(f"에포크 {epoch+1} (Step {global_step:06d}): "
+                      f"훈련 손실 {train_loss:.3f}, "
+                      f"검증 손실 {val_loss:.3f}"
+                )
+        generate_and_print_sample(model, tokenizer, device, start_context)
+    return train_losses, val_losses, track_token_seen
+    #raise NotImplementedError("train_model을 구현하세요.")
 
 
 def plot_losses(train_losses: list[float], val_losses: list[float] | None = None) -> None:
