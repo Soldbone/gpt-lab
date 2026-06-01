@@ -124,6 +124,14 @@ def generate(
     return idx
     #raise NotImplementedError("generate를 구현하세요.")
 
+def text_to_token_ids(text, tokenizer):
+    encoded = tokenizer.encode(text, allowed_special={'<|endoftext|>'})
+    encoded_tensor = torch.tensor(encoded).unsqueeze(0)
+    return encoded_tensor
+
+def token_ids_to_text(token_ids, tokenizer):
+    flat = token_ids.squeeze(0)
+    return tokenizer.decode(flat.tolist())
 
 def generate_and_print_sample(
     model: GPTModel,
@@ -136,7 +144,20 @@ def generate_and_print_sample(
     top_k: int | None = 40,
 ) -> None:
     """TODO: start_context를 encode하고 generate 후 decode하여 출력합니다."""
-    raise NotImplementedError("generate_and_print_sample을 구현하세요.")
+    model.eval()
+    encoded = text_to_token_ids(start_context, tokenizer).to(device)
+    with torch.no_grad():
+        token_ids = generate(
+            model=model,
+            idx=encoded,
+            max_new_tokens=max_new_tokens, context_size=context_size,
+            temperature=temperature,
+            top_k=top_k
+        )
+    decoded_text = token_ids_to_text(token_ids, tokenizer)
+    print(decoded_text.replace("\n", " "))
+    model.train()
+    #raise NotImplementedError("generate_and_print_sample을 구현하세요.")
 
 
 def train_model(
