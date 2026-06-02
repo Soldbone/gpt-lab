@@ -26,7 +26,50 @@ def make_sentiment_dataset(
     반환 형식:
         [{"text": "리뷰", "label": 0 또는 1}, ...]
     """
-    raise NotImplementedError("make_sentiment_dataset을 구현하세요.")
+    import csv, random
+
+    train_data, val_data, test_data = [], [], []
+    with open(train_tsv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            train_data.append({
+                "text": row["document"],
+                "label": int(row["label"])
+            })
+
+    random_num = random.Random(seed)
+    random_num.shuffle(train_data)
+    val_size = int(len(train_data) * val_ratio)
+
+    val_data = train_data[:val_size]
+    train_data = train_data[val_size:]
+
+    with open(test_tsv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            test_data.append({
+                "text": row["document"],
+                "label": int(row["label"])
+            })
+
+    if output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        output_path = output_dir / "test.tsv"
+
+        with open(output_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["text", "label"],
+                delimiter="\t"
+            )
+
+            writer.writeheader()
+            writer.writerows(test_data)
+
+    return (train_data, val_data, test_data)
+    #raise NotImplementedError("make_sentiment_dataset을 구현하세요.")
 
 
 class ReviewSentimentDataset(Dataset):
