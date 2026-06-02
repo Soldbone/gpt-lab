@@ -1,0 +1,45 @@
+Loaded tokenizer: /Users/yang-eun-yeol/Desktop/jungle_problem/밑바닥부터 만들면서 배우는 LLM/gpt-lab/checkpoints/bpe_vocab_3000.json
+Device: cpu
+Tokenizer vocab: 3000
+Model params: 1,180,416
+Hyperparameters: context=128, emb=128, layers=2, heads=4, drop=0.1, batch=8, epochs=5, lr=0.0003
+Batches: train=1,103, val=97
+에포크 1 (Step 000500): 훈련 손실 5.532, 검증 손실 5.552
+Traceback (most recent call last):
+  File "/Users/yang-eun-yeol/Desktop/jungle_problem/밑바닥부터 만들면서 배우는 LLM/gpt-lab/pretrain.py", line 209, in <module>
+    num_params = sum(p.numel() for p in model.parameters())
+    ^^^^^^
+  File "/Users/yang-eun-yeol/Desktop/jungle_problem/밑바닥부터 만들면서 배우는 LLM/gpt-lab/pretrain.py", line 186, in main
+    
+    
+    ...<13 lines>...
+        weight_decay=args.weight_decay,
+        ^
+  File "/Users/yang-eun-yeol/Desktop/jungle_problem/밑바닥부터 만들면서 배우는 LLM/gpt-lab/src/train.py", line 212, in train_model
+    loss.backward()
+    ~~~~~~~~~~~~~^^
+  File "/Users/yang-eun-yeol/miniforge3/lib/python3.13/site-packages/torch/_tensor.py", line 631, in backward
+    torch.autograd.backward(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        self, gradient, retain_graph, create_graph, inputs=inputs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yang-eun-yeol/miniforge3/lib/python3.13/site-packages/torch/autograd/__init__.py", line 379, in backward
+    _engine_run_backward(
+    ~~~~~~~~~~~~~~~~~~~~^
+        tensors,
+        ^^^^^^^^
+    ...<5 lines>...
+        accumulate_grad=True,
+        ^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yang-eun-yeol/miniforge3/lib/python3.13/site-packages/torch/autograd/graph.py", line 882, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        t_outputs, *args, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )  # Calls into the C++ engine to run the backward pass
+    ^
+KeyboardInterrupt
