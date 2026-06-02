@@ -1,0 +1,10 @@
+이미 존재합니다: C:\sw\gpt-lab\data\ratings_train.txt
+이미 존재합니다: C:\sw\gpt-lab\data\ratings_test.txt
+사전 학습 train 텍스트: C:\sw\gpt-lab\data\nsmc_lm_train.txt (1,379,486자)
+사전 학습 val 텍스트: C:\sw\gpt-lab\data\nsmc_lm_val.txt (120,560자)
+감성 분류 train: C:\sw\gpt-lab\data\nsmc_sentiment_train.jsonl (137,996개)
+감성 분류 val: C:\sw\gpt-lab\data\nsmc_sentiment_val.jsonl (11,999개)
+감성 분류 test: C:\sw\gpt-lab\data\nsmc_sentiment_test.jsonl (49,997개)
+device=cpu
+preset=final
+train_chars=1379486 val_chars=120560

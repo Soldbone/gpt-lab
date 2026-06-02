@@ -1,0 +1,3 @@
+split,loss,num_batches,eval_batches,token_count
+val,5.815332412719727,15,2,1949
+test,5.872721910476685,27852,2,3565011

@@ -1,0 +1,2 @@
+epoch,global_step,train_loss,val_loss,generalization_gap,val_loss_delta,best_val_loss_so_far,best_epoch_so_far,lr,elapsed_sec
+1,23,5.747673273086548,5.815332412719727,0.06765913963317871,,5.815332412719727,1,1e-05,0.4499838352203369

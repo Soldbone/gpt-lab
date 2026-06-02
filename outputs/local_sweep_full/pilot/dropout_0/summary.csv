@@ -1,0 +1,2 @@
+name,lr,context_length,emb_dim,n_heads,n_layers,drop_rate,batch_size,num_epochs,eval_freq,eval_iter,weight_decay,qkv_bias,vocab_size,param_count,steps_per_epoch,total_steps,best_val_loss,best_step,final_train_loss,final_val_loss,elapsed_sec
+dropout_0,0.0003,64,128,4,2,0.0,16,2,100,20,0.1,False,500,532224,1652,3304,3.0066174149513243,3304,3.0338122606277467,3.0066174149513243,148.0054578781128

@@ -1,0 +1,57 @@
+이미 존재합니다: C:\sw\gpt-lab\data\ratings_train.txt
+이미 존재합니다: C:\sw\gpt-lab\data\ratings_test.txt
+사전 학습 train 텍스트: C:\sw\gpt-lab\data\nsmc_lm_train.txt (1,379,486자)
+사전 학습 val 텍스트: C:\sw\gpt-lab\data\nsmc_lm_val.txt (120,560자)
+감성 분류 train: C:\sw\gpt-lab\data\nsmc_sentiment_train.jsonl (137,996개)
+감성 분류 val: C:\sw\gpt-lab\data\nsmc_sentiment_val.jsonl (11,999개)
+감성 분류 test: C:\sw\gpt-lab\data\nsmc_sentiment_test.jsonl (49,997개)
+device=cpu
+preset=final
+train_chars=1379486 val_chars=120560
+final_ctx128_layers4_lr3e-4 epoch=0.121 step=000100 train=4.5918 val=4.5822
+final_ctx128_layers4_lr3e-4 epoch=0.242 step=000200 train=3.9230 val=3.9087
+final_ctx128_layers4_lr3e-4 epoch=0.363 step=000300 train=3.7272 val=3.7190
+final_ctx128_layers4_lr3e-4 epoch=0.484 step=000400 train=3.6241 val=3.6207
+final_ctx128_layers4_lr3e-4 epoch=0.605 step=000500 train=3.5581 val=3.5587
+final_ctx128_layers4_lr3e-4 epoch=0.726 step=000600 train=3.4919 val=3.5024
+final_ctx128_layers4_lr3e-4 epoch=0.847 step=000700 train=3.4317 val=3.4430
+final_ctx128_layers4_lr3e-4 epoch=0.969 step=000800 train=3.3819 val=3.3838
+final_ctx128_layers4_lr3e-4 epoch=1.000 step=000826 train=3.3492 val=3.3697
+final_ctx128_layers4_lr3e-4 epoch=1.090 step=000900 train=3.3353 val=3.3347
+final_ctx128_layers4_lr3e-4 epoch=1.211 step=001000 train=3.2914 val=3.2960
+final_ctx128_layers4_lr3e-4 epoch=1.332 step=001100 train=3.2742 val=3.2573
+final_ctx128_layers4_lr3e-4 epoch=1.453 step=001200 train=3.2078 val=3.2269
+final_ctx128_layers4_lr3e-4 epoch=1.574 step=001300 train=3.1665 val=3.1918
+final_ctx128_layers4_lr3e-4 epoch=1.695 step=001400 train=3.1333 val=3.1626
+final_ctx128_layers4_lr3e-4 epoch=1.816 step=001500 train=3.1291 val=3.1342
+final_ctx128_layers4_lr3e-4 epoch=1.937 step=001600 train=3.1111 val=3.1088
+final_ctx128_layers4_lr3e-4 epoch=2.000 step=001652 train=3.0545 val=3.0932
+final_ctx128_layers4_lr3e-4 epoch=2.058 step=001700 train=3.0562 val=3.0803
+final_ctx128_layers4_lr3e-4 epoch=2.179 step=001800 train=3.0103 val=3.0591
+final_ctx128_layers4_lr3e-4 epoch=2.300 step=001900 train=3.0159 val=3.0388
+final_ctx128_layers4_lr3e-4 epoch=2.421 step=002000 train=3.0003 val=3.0141
+final_ctx128_layers4_lr3e-4 epoch=2.542 step=002100 train=2.9808 val=2.9920
+final_ctx128_layers4_lr3e-4 epoch=2.663 step=002200 train=2.9621 val=2.9771
+final_ctx128_layers4_lr3e-4 epoch=2.785 step=002300 train=2.9327 val=2.9616
+final_ctx128_layers4_lr3e-4 epoch=2.906 step=002400 train=2.8940 val=2.9426
+final_ctx128_layers4_lr3e-4 epoch=3.000 step=002478 train=2.8760 val=2.9286
+final_ctx128_layers4_lr3e-4 epoch=3.027 step=002500 train=2.9004 val=2.9269
+final_ctx128_layers4_lr3e-4 epoch=3.148 step=002600 train=2.8773 val=2.9132
+final_ctx128_layers4_lr3e-4 epoch=3.269 step=002700 train=2.8641 val=2.8993
+final_ctx128_layers4_lr3e-4 epoch=3.390 step=002800 train=2.8461 val=2.8844
+final_ctx128_layers4_lr3e-4 epoch=3.511 step=002900 train=2.8428 val=2.8752
+final_ctx128_layers4_lr3e-4 epoch=3.632 step=003000 train=2.8277 val=2.8641
+final_ctx128_layers4_lr3e-4 epoch=3.753 step=003100 train=2.8146 val=2.8553
+final_ctx128_layers4_lr3e-4 epoch=3.874 step=003200 train=2.8027 val=2.8395
+final_ctx128_layers4_lr3e-4 epoch=3.995 step=003300 train=2.7611 val=2.8295
+final_ctx128_layers4_lr3e-4 epoch=4.000 step=003304 train=2.7892 val=2.8298
+final_ctx128_layers4_lr3e-4 epoch=4.116 step=003400 train=2.8014 val=2.8264
+final_ctx128_layers4_lr3e-4 epoch=4.237 step=003500 train=2.7775 val=2.8142
+final_ctx128_layers4_lr3e-4 epoch=4.358 step=003600 train=2.7774 val=2.8090
+final_ctx128_layers4_lr3e-4 epoch=4.479 step=003700 train=2.7223 val=2.7981
+final_ctx128_layers4_lr3e-4 epoch=4.600 step=003800 train=2.7357 val=2.7921
+final_ctx128_layers4_lr3e-4 epoch=4.722 step=003900 train=2.7326 val=2.7805
+final_ctx128_layers4_lr3e-4 epoch=4.843 step=004000 train=2.7183 val=2.7732
+final_ctx128_layers4_lr3e-4 epoch=4.964 step=004100 train=2.7084 val=2.7649
+final_ctx128_layers4_lr3e-4 epoch=5.000 step=004130 train=2.7174 val=2.7615
+saved=C:\sw\gpt-lab\outputs\local_sweep_full\final

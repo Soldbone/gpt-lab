@@ -1,0 +1,13 @@
+{
+  "run_name": "smoke",
+  "artifact_dir": "C:\\sw\\gpt-lab\\outputs\\pipeline_smoke",
+  "best_val_loss": 5.815332412719727,
+  "best_epoch": 1,
+  "final_train_loss": 5.747673273086548,
+  "final_val_loss": 5.815332412719727,
+  "global_step": 23,
+  "completed_epochs": 1,
+  "early_stopped": false,
+  "best_checkpoint": "C:\\sw\\gpt-lab\\outputs\\pipeline_smoke\\runs\\smoke\\best_checkpoint.pt",
+  "last_checkpoint": "C:\\sw\\gpt-lab\\outputs\\pipeline_smoke\\runs\\smoke\\last_checkpoint.pt"
+}
