@@ -36,12 +36,6 @@ class MultiHeadAttention(nn.Module):
         self.out_proj = nn.Linear(d_model, d_model)
         self.dropout = nn.Dropout(drop_rate)
 
-        self.register_buffer(
-            "mask",
-            torch.triu(torch.ones(self.d_model, self.d_model),
-                       diagonal=1)
-        )
-
         # raise NotImplementedError("MultiHeadAttention.__init__을 구현하세요.")
 
     def forward(
@@ -72,7 +66,10 @@ class MultiHeadAttention(nn.Module):
         queries = queries.transpose(1, 2)
 
         attn_scores = queries @ keys.transpose(2, 3)
-        mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
+        mask_bool = torch.triu(
+            torch.ones(num_tokens, num_tokens, device=x.device, dtype=torch.bool),
+            diagonal=1,
+        )
 
         if causal_mask:
             attn_scores.masked_fill_(mask_bool, -torch.inf)
