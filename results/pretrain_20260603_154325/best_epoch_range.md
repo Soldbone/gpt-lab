@@ -1,0 +1,5 @@
+| metric | epoch | step | train_loss | val_loss | test_loss | val_ppl | note |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| best_val_loss | 1 | 4000 | 4.590272 | 4.596139 | 4.721160 | 99.100938 | recommended checkpoint |
+| near_best_1_percent_start | 1 | 4000 | 4.590272 | 4.596139 | 4.721160 | 99.100938 | first eval within 1% of best val loss |
+| near_best_1_percent_end | 1 | 4000 | 4.590272 | 4.596139 | 4.721160 | 99.100938 | overfit_flag=False |

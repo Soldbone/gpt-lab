@@ -7,6 +7,8 @@ import argparse
 import csv
 import json
 import math
+import os
+import textwrap
 from pathlib import Path
 from datetime import datetime
 
@@ -292,27 +294,281 @@ def write_markdown_table(path: Path, rows: list[dict], fieldnames: list[str] | N
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def plot_metric_curve(history: list[dict], metric_prefix: str, ylabel: str, title: str, path: Path) -> None:
+def get_pyplot(path: Path):
+    mpl_config_root = path.parent.parent if path.parent.name.startswith("pretrain_") else path.parent
+    mpl_config_dir = mpl_config_root / ".matplotlib"
+    mpl_config_dir.mkdir(exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(mpl_config_dir))
+
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    try:
+        from matplotlib import font_manager
+
+        available_fonts = {font.name for font in font_manager.fontManager.ttflist}
+        for font_name in ["AppleGothic", "NanumGothic", "Malgun Gothic"]:
+            if font_name in available_fonts:
+                plt.rcParams["font.family"] = font_name
+                break
+    except Exception:
+        pass
+    plt.rcParams.update({
+        "figure.facecolor": "#f8fafc",
+        "axes.facecolor": "#ffffff",
+        "axes.edgecolor": "#cbd5e1",
+        "axes.labelcolor": "#111827",
+        "axes.labelsize": 13,
+        "axes.titlesize": 17,
+        "axes.titleweight": "bold",
+        "xtick.color": "#334155",
+        "ytick.color": "#334155",
+        "xtick.labelsize": 11,
+        "ytick.labelsize": 11,
+        "legend.fontsize": 11,
+        "grid.color": "#cbd5e1",
+    })
+    plt.rcParams["axes.unicode_minus"] = False
+    return plt
+
+
+def plot_metric_curve(history: list[dict], metric_prefix: str, ylabel: str, title: str, path: Path) -> None:
+    plt = get_pyplot(path)
+
     steps = [row["step"] for row in history]
-    plt.figure(figsize=(11, 6))
+    fig, ax = plt.subplots(figsize=(13, 7))
     for split, color in [("train", "#2563eb"), ("val", "#dc2626"), ("test", "#059669")]:
         key = f"{split}_{metric_prefix}"
         values = [row[key] for row in history]
-        plt.plot(steps, values, label=split, linewidth=2, color=color)
-        plt.scatter([steps[-1]], [values[-1]], color=color, s=28)
-    plt.title(title)
-    plt.xlabel("Training step")
-    plt.ylabel(ylabel)
-    plt.grid(True, alpha=0.35)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(path, dpi=180)
-    plt.close()
+        ax.plot(steps, values, label=split, linewidth=2.8, color=color, marker="o", markersize=5)
+        ax.annotate(
+            f"{split}: {values[-1]:.3f}",
+            xy=(steps[-1], values[-1]),
+            xytext=(8, 0),
+            textcoords="offset points",
+            va="center",
+            fontsize=10,
+            color=color,
+            fontweight="bold",
+        )
+    ax.set_title(title, pad=16)
+    ax.set_xlabel("Training step")
+    ax.set_ylabel(ylabel)
+    if metric_prefix == "ppl":
+        finite_values = [
+            row[f"{split}_{metric_prefix}"]
+            for row in history
+            for split in ["train", "val", "test"]
+            if not math.isnan(row[f"{split}_{metric_prefix}"])
+        ]
+        if finite_values and max(finite_values) / max(min(finite_values), 1e-9) > 20:
+            ax.set_yscale("log")
+            ax.set_ylabel(f"{ylabel} (log scale)")
+    ax.grid(True, axis="y", alpha=0.6)
+    ax.legend(loc="best", frameon=True)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def is_png_safe_char(ch: str) -> bool:
+    code = ord(ch)
+    return (
+        0x20 <= code <= 0x7E
+        or 0x1100 <= code <= 0x11FF
+        or 0x3130 <= code <= 0x318F
+        or 0xAC00 <= code <= 0xD7A3
+        or ch in "·…“”‘’"
+    )
+
+
+def wrap_table_cell(value, width: int = 32, max_lines: int = 5) -> str:
+    text = str(value).replace("\uFFFD", "?").replace("\n", " ")
+    text = "".join(ch if ch.isprintable() and is_png_safe_char(ch) else "?" for ch in text)
+    lines = textwrap.wrap(text, width=width, break_long_words=True) or [""]
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(".") + "..."
+    return "\n".join(lines)
+
+
+def write_png_table(
+    path: Path,
+    rows: list[dict],
+    title: str,
+    fieldnames: list[str] | None = None,
+    wrap_width: int = 32,
+    max_lines: int = 5,
+) -> None:
+    plt = get_pyplot(path)
+    if not rows:
+        fig, ax = plt.subplots(figsize=(8, 2.4))
+        ax.axis("off")
+        ax.set_title(title, fontsize=15, fontweight="bold", pad=12)
+        ax.text(0.5, 0.45, "No rows", ha="center", va="center", fontsize=12)
+        fig.tight_layout()
+        fig.savefig(path, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        return
+
+    if fieldnames is None:
+        fieldnames = list(rows[0].keys())
+    cell_text = [
+        [wrap_table_cell(row.get(name, ""), width=wrap_width, max_lines=max_lines) for name in fieldnames]
+        for row in rows
+    ]
+    row_heights = [
+        max(str(cell).count("\n") + 1 for cell in row)
+        for row in cell_text
+    ]
+    fig_width = min(max(8.5, len(fieldnames) * 2.2), 18)
+    fig_height = min(max(2.8, 1.0 + sum(max(1.0, lines * 0.42) for lines in row_heights)), 28)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis("off")
+    ax.set_title(title, fontsize=15, fontweight="bold", pad=14)
+
+    table = ax.table(
+        cellText=cell_text,
+        colLabels=fieldnames,
+        cellLoc="left",
+        colLoc="left",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.05, 1.45)
+
+    for (row_idx, _col_idx), cell in table.get_celld().items():
+        if row_idx == 0:
+            cell.set_facecolor("#e5e7eb")
+            cell.set_text_props(weight="bold", color="#111827")
+            cell.set_height(0.08)
+        else:
+            cell.set_facecolor("#ffffff" if row_idx % 2 else "#f9fafb")
+            cell.set_height(max(0.08, row_heights[row_idx - 1] * 0.05))
+        cell.set_edgecolor("#d1d5db")
+
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.9, bottom=0.02)
+    fig.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_topn_accuracy(top_rows: list[dict], path: Path) -> None:
+    plt = get_pyplot(path)
+    datasets = ["train", "val", "test"]
+    top_values = sorted({int(row["top_n"]) for row in top_rows})
+    score_map = {
+        (row["dataset"], int(row["top_n"])): float(row["accuracy"]) * 100
+        for row in top_rows
+    }
+    colors = {"train": "#2563eb", "val": "#dc2626", "test": "#059669"}
+    width = 0.24
+    x_positions = list(range(len(top_values)))
+    fig, ax = plt.subplots(figsize=(12.5, 7))
+
+    all_scores = []
+    for dataset_idx, dataset in enumerate(datasets):
+        offsets = [x + (dataset_idx - 1) * width for x in x_positions]
+        scores = [score_map.get((dataset, top_n), float("nan")) for top_n in top_values]
+        plot_scores = [0 if math.isnan(score) else score for score in scores]
+        all_scores.extend(plot_scores)
+        bars = ax.bar(
+            offsets,
+            plot_scores,
+            width=width,
+            label=dataset,
+            color=colors[dataset],
+            alpha=0.9,
+            edgecolor="#ffffff",
+            linewidth=1.2,
+        )
+        for bar, score in zip(bars, scores):
+            label = "nan" if math.isnan(score) else f"{score:.2f}%"
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=10,
+                color=colors[dataset],
+                fontweight="bold",
+            )
+
+    max_score = max(all_scores) if all_scores else 0
+    ax.set_ylim(0, min(100, max(1.0, max_score * 1.28 + 0.5)))
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels([f"Top-{top_n}" for top_n in top_values])
+    ax.set_ylabel("Accuracy (%)")
+    ax.set_title("Top-N Accuracy by Dataset", pad=16)
+    ax.grid(True, axis="y", alpha=0.55)
+    ax.legend(loc="upper left", frameon=True)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+def plot_best_epoch_range(history: list[dict], path: Path) -> None:
+    plt = get_pyplot(path)
+    best = min(history, key=lambda row: row["val_loss"])
+    threshold = best["val_loss"] * 1.01
+    near_best = [row for row in history if row["val_loss"] <= threshold]
+    first = near_best[0]
+    last = near_best[-1]
+    overfit_flag = history[-1]["val_loss"] > best["val_loss"] * 1.02
+    steps = [row["step"] for row in history]
+    colors = {"train": "#2563eb", "val": "#dc2626", "test": "#059669"}
+
+    fig, ax = plt.subplots(figsize=(13, 7))
+    for split in ["train", "val", "test"]:
+        key = f"{split}_loss"
+        ax.plot(
+            steps,
+            [row[key] for row in history],
+            label=f"{split} loss",
+            color=colors[split],
+            linewidth=2.8,
+            marker="o",
+            markersize=5,
+        )
+
+    if first["step"] == last["step"]:
+        ax.axvline(best["step"], color="#f59e0b", linestyle="--", linewidth=2.5, label="best range")
+    else:
+        ax.axvspan(first["step"], last["step"], color="#f59e0b", alpha=0.18, label="within 1% of best val")
+    ax.scatter([best["step"]], [best["val_loss"]], color="#7c3aed", s=140, zorder=5, label="best val loss")
+    ax.annotate(
+        f"Best epoch {best['epoch']}\nstep {best['step']}\nval loss {best['val_loss']:.3f}",
+        xy=(best["step"], best["val_loss"]),
+        xytext=(24, 28),
+        textcoords="offset points",
+        arrowprops={"arrowstyle": "->", "color": "#7c3aed", "linewidth": 1.8},
+        bbox={"boxstyle": "round,pad=0.45", "fc": "#f5f3ff", "ec": "#7c3aed", "alpha": 0.95},
+        fontsize=11,
+        color="#312e81",
+        fontweight="bold",
+    )
+    status = "Overfit signal: yes" if overfit_flag else "Overfit signal: no"
+    ax.text(
+        0.99,
+        0.03,
+        f"Recommended: epoch {best['epoch']} / step {best['step']}\nNear-best: step {first['step']} ~ {last['step']}\n{status}",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=11,
+        bbox={"boxstyle": "round,pad=0.5", "fc": "#ffffff", "ec": "#cbd5e1", "alpha": 0.95},
+    )
+    ax.set_title("Best Epoch / Overfit Check", pad=16)
+    ax.set_xlabel("Training step")
+    ax.set_ylabel("Cross-entropy loss")
+    ax.grid(True, axis="y", alpha=0.55)
+    ax.legend(loc="best", frameon=True)
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
 
 
 def compute_topk_accuracy(
@@ -453,6 +709,7 @@ def write_training_results(
             "test_ppl": f"{row['test_ppl']:.6f}",
         })
     write_csv(run_dir / "metrics_history.csv", history_rows)
+    write_png_table(run_dir / "metrics_history.png", history_rows, "Metrics History")
 
     plot_metric_curve(history, "loss", "Cross-entropy loss", "Train / Val / Test Loss", run_dir / "loss_curve.png")
     plot_metric_curve(history, "ppl", "Perplexity", "Train / Val / Test Perplexity", run_dir / "perplexity_curve.png")
@@ -468,10 +725,12 @@ def write_training_results(
             })
     write_csv(run_dir / "top_n_accuracy.csv", top_rows)
     write_markdown_table(run_dir / "top_n_accuracy.md", top_rows)
+    plot_topn_accuracy(top_rows, run_dir / "top_n_accuracy.png")
 
     best_rows = make_best_epoch_rows(history)
     write_csv(run_dir / "best_epoch_range.csv", best_rows)
     write_markdown_table(run_dir / "best_epoch_range.md", best_rows)
+    plot_best_epoch_range(history, run_dir / "best_epoch_range.png")
 
     prompt_rows = [
         {"source": "start_context", "prompt": args.start_context[:80]},
@@ -495,6 +754,13 @@ def write_training_results(
         })
     write_csv(run_dir / "sample_outputs.csv", sample_rows)
     write_markdown_table(run_dir / "sample_outputs.md", sample_rows)
+    write_png_table(
+        run_dir / "sample_outputs.png",
+        sample_rows,
+        "Input / Output Samples",
+        wrap_width=42,
+        max_lines=7,
+    )
 
     final = history[-1]
     best = min(history, key=lambda row: row["val_loss"])
@@ -538,6 +804,7 @@ def write_training_results(
     ]
     write_csv(run_dir / "summary.csv", summary_rows)
     write_markdown_table(run_dir / "summary.md", summary_rows)
+    write_png_table(run_dir / "summary.png", summary_rows, "Training Summary", wrap_width=48, max_lines=4)
     (run_dir / "summary.json").write_text(
         json.dumps({row["item"]: row["value"] for row in summary_rows}, ensure_ascii=False, indent=2),
         encoding="utf-8",
