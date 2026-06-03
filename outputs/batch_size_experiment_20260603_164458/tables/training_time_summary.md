@@ -1,0 +1,4 @@
+| batch_size | total_training_time | average_epoch_time |
+| --- | --- | --- |
+| 2 | 0.489 | 0.489 |
+| 4 | 0.302 | 0.302 |

@@ -1,0 +1,4 @@
+Starting batch_size=2 with seed=42
+Saved best checkpoint at epoch=1, val_loss=5.612256
+Epoch 001: train_loss=5.6701, val_loss=5.6123, test_loss=5.6602, epoch_time=0.48s
+Saved final checkpoint: C:\sw\gpt-lab\outputs\batch_size_experiment_20260603_164352\checkpoints\batch_2\final.pt

@@ -1,0 +1,32 @@
+[
+  {
+    "batch_size": 4,
+    "seed": 42,
+    "epoch": 1,
+    "global_step": 41,
+    "train_loss": 5.796555519104004,
+    "val_loss": 5.656569480895996,
+    "test_loss": 5.747501850128174,
+    "train_ppl": 329.16380654888457,
+    "val_ppl": 286.1652613704556,
+    "test_ppl": 313.4067445052111,
+    "train_top_1_accuracy": 0.0078125,
+    "train_top_3_accuracy": 0.0078125,
+    "train_top_5_accuracy": 0.0234375,
+    "val_top_1_accuracy": 0.0,
+    "val_top_3_accuracy": 0.0234375,
+    "val_top_5_accuracy": 0.0703125,
+    "test_top_1_accuracy": 0.0078125,
+    "test_top_3_accuracy": 0.015625,
+    "test_top_5_accuracy": 0.0234375,
+    "top_1_accuracy": 0.0078125,
+    "top_3_accuracy": 0.015625,
+    "top_5_accuracy": 0.0234375,
+    "epoch_time": 0.28415580000000773,
+    "total_training_time": 0.3015118999999231,
+    "average_epoch_time": 0.3015118999999231,
+    "max_gpu_memory_allocated": "N/A",
+    "max_gpu_memory_reserved": "N/A",
+    "memory_status": "CUDA not available"
+  }
+]

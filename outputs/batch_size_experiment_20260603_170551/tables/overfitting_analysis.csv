@@ -1,0 +1,4 @@
+batch_size,final_train_loss,final_val_loss,loss_gap,final_train_ppl,final_val_ppl,ppl_gap,overfitting_comment
+4,3.937161,4.077299,0.140138,51.272816,58.985943,7.713127,Train and validation losses are close.
+8,4.035395,4.164609,0.129214,56.565281,64.367503,7.802222,Train and validation losses are close.
+16,4.113447,4.223969,0.110522,61.157138,68.304050,7.146912,Train and validation losses are close.

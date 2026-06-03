@@ -1,0 +1,35 @@
+{
+  "seed": 42,
+  "batch_sizes": [
+    2,
+    4
+  ],
+  "epochs": 1,
+  "corpus_size": 3000,
+  "vocab_size": 300,
+  "context_length": 32,
+  "emb_dim": 32,
+  "n_layers": 1,
+  "n_heads": 4,
+  "drop_rate": 0.1,
+  "lr": 0.0003,
+  "weight_decay": 0.1,
+  "stride": null,
+  "eval_batches": 1,
+  "accuracy_eval_batches": 1,
+  "top_n_values": [
+    1,
+    3,
+    5
+  ],
+  "tokenizer_path": "C:\\sw\\gpt-lab\\checkpoints_dropout01_vocab3000\\bpe_vocab_300.json",
+  "tokenizer_mode": "loaded-existing",
+  "device": "cpu",
+  "cuda_available": false,
+  "train_chars": 3000,
+  "val_chars": 120560,
+  "test_chars": 1815903,
+  "train_tokens": 5361,
+  "val_tokens": 216482,
+  "test_tokens": 3251802
+}

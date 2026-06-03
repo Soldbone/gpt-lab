@@ -1,0 +1,22 @@
+Starting batch_size=16 with seed=42
+Saved best checkpoint at epoch=1, val_loss=5.260233
+Epoch 001: train_loss=5.2545, val_loss=5.2602, test_loss=5.2669, epoch_time=12.18s
+Saved best checkpoint at epoch=2, val_loss=4.748356
+Epoch 002: train_loss=4.7221, val_loss=4.7484, test_loss=4.7545, epoch_time=11.57s
+Saved best checkpoint at epoch=3, val_loss=4.547428
+Epoch 003: train_loss=4.5046, val_loss=4.5474, test_loss=4.5531, epoch_time=11.03s
+Saved best checkpoint at epoch=4, val_loss=4.442834
+Epoch 004: train_loss=4.3872, val_loss=4.4428, test_loss=4.4497, epoch_time=11.73s
+Saved best checkpoint at epoch=5, val_loss=4.375233
+Epoch 005: train_loss=4.3077, val_loss=4.3752, test_loss=4.3821, epoch_time=11.54s
+Saved best checkpoint at epoch=6, val_loss=4.326467
+Epoch 006: train_loss=4.2511, val_loss=4.3265, test_loss=4.3361, epoch_time=11.69s
+Saved best checkpoint at epoch=7, val_loss=4.296936
+Epoch 007: train_loss=4.2102, val_loss=4.2969, test_loss=4.3052, epoch_time=11.42s
+Saved best checkpoint at epoch=8, val_loss=4.264950
+Epoch 008: train_loss=4.1709, val_loss=4.2650, test_loss=4.2749, epoch_time=11.52s
+Saved best checkpoint at epoch=9, val_loss=4.243602
+Epoch 009: train_loss=4.1409, val_loss=4.2436, test_loss=4.2527, epoch_time=11.36s
+Saved best checkpoint at epoch=10, val_loss=4.223969
+Epoch 010: train_loss=4.1134, val_loss=4.2240, test_loss=4.2336, epoch_time=11.66s
+Saved final checkpoint: C:\sw\gpt-lab\outputs\batch_size_experiment_20260603_170551\checkpoints\batch_16\final.pt
