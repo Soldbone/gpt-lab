@@ -194,6 +194,7 @@ def train_model(
     start_epoch: int = 0,
     global_step: int = 0,
     checkpoint_dir: str | Path = "checkpoints",
+    eval_callback=None,
 ) -> list[float]:
     """TODO: 사전 학습 루프를 구현하고 epoch별 train loss 리스트를 반환합니다."""
     train_losses, val_losses= [], []
@@ -223,6 +224,8 @@ def train_model(
                       f"훈련 손실 {train_loss:.3f}, "
                       f"검증 손실 {val_loss:.3f}"
                 )  
+                if eval_callback is not None:
+                    eval_callback(epoch + 1, global_step, train_loss, val_loss)
             if ckpt_freq is not None and global_step % ckpt_freq == 0:
                 path=Path(checkpoint_dir) / f"ckpt_step_{global_step:06d}.pt"
                 save_checkpoint(model, optimizer, epoch, global_step, path)
