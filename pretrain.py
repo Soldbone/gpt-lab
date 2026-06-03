@@ -22,7 +22,7 @@ from src.train import calc_loss_loader, generate, load_checkpoint, save_checkpoi
 ROOT = Path(__file__).resolve().parent
 
 DEFAULT_HYPERPARAMS = {
-    #기본 파라미터:vocab_size:3000, epoch:10, context_length:128, 
+    #기본 파라미터:vocab_size:3000, epoch:10, context_length:128,
     #corphus:1,500,000, emb_dim:128, drop_rate:0.1
     # layer:2,4,6, lr:3e-4,1e-4,5e-4 batch_size:4,8,16 n_heads:3,4,6
     "train_path": ROOT / "data" / "nsmc_lm_train.txt",
@@ -31,16 +31,16 @@ DEFAULT_HYPERPARAMS = {
     "tokenizer_path": ROOT / "checkpoints" / "bpe_vocab_3000.json",
     "output_dir": ROOT / "checkpoints" / "pretrain_from_scratch",
     "results_dir": ROOT / "results",
-    "vocab_size": 3000, 
+    "vocab_size": 3000,
     "context_length": 128,
     "stride": None,
     "emb_dim": 128,
-    "n_heads": 4, 
+    "n_heads": 4,
     "n_layers": 2,
     "drop_rate": 0.1,
     "batch_size": 2,
     "num_workers": 0,
-    "epochs": 1,  
+    "epochs": 1,
     "lr": 3e-4,
     "weight_decay": 0.1,
     "eval_freq": 500,
@@ -49,7 +49,7 @@ DEFAULT_HYPERPARAMS = {
     "resume": None,
     "device": "auto",
     "start_context": "영화",
-    "max_train_chars": None, #corpus
+    "max_train_chars": None,
     "max_val_chars": None,
     "max_test_chars": None,
     "report_eval_iter": None,
@@ -57,6 +57,447 @@ DEFAULT_HYPERPARAMS = {
     "report_sample_tokens": 40,
 }
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Palette & style constants
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Core palette
+C_TRAIN  = "#3B82F6"   # blue-500
+C_VAL    = "#10B981"   # emerald-500
+C_TEST   = "#F59E0B"   # amber-400
+C_BEST   = "#8B5CF6"   # violet-500
+C_SPAN   = "#FCD34D"   # amber-300
+
+# Neutral surface palette
+BG_PAGE  = "#F8F9FA"
+BG_AXES  = "#FFFFFF"
+BG_GRID  = "#F1F3F5"
+COL_EDGE = "#DEE2E6"
+COL_TICK = "#6C757D"
+COL_TEXT = "#212529"
+COL_SUB  = "#6C757D"
+
+SPLIT_COLORS = {"train": C_TRAIN, "val": C_VAL, "test": C_TEST}
+SPLIT_LABELS = {"train": "Train", "val": "Val", "test": "Test"}
+
+MARKER_STYLE = dict(markersize=5, markeredgewidth=0.8, markeredgecolor="white")
+LINE_STYLE   = dict(linewidth=2.2, solid_capstyle="round", solid_joinstyle="round")
+ANNOT_BOX    = dict(boxstyle="round,pad=0.45", fc="white", ec=COL_EDGE, alpha=0.95, lw=0.8)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Matplotlib bootstrap
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_pyplot(path: Path):
+    """Return a configured matplotlib.pyplot instance."""
+    mpl_config_root = (
+        path.parent.parent
+        if path.parent.name.startswith("pretrain_")
+        else path.parent
+    )
+    mpl_config_dir = mpl_config_root / ".matplotlib"
+    mpl_config_dir.mkdir(exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(mpl_config_dir))
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+
+    # Korean font detection
+    try:
+        available = {f.name for f in font_manager.fontManager.ttflist}
+        for name in ["AppleGothic", "NanumGothic", "Malgun Gothic"]:
+            if name in available:
+                plt.rcParams["font.family"] = name
+                break
+    except Exception:
+        pass
+
+    plt.rcParams.update({
+        # Figure
+        "figure.facecolor":     BG_PAGE,
+        "figure.dpi":           150,
+        # Axes
+        "axes.facecolor":       BG_AXES,
+        "axes.edgecolor":       COL_EDGE,
+        "axes.linewidth":       0.8,
+        "axes.labelcolor":      COL_TEXT,
+        "axes.labelsize":       12,
+        "axes.labelpad":        8,
+        "axes.titlesize":       15,
+        "axes.titleweight":     "semibold",
+        "axes.titlepad":        14,
+        "axes.titlecolor":      COL_TEXT,
+        "axes.spines.top":      False,
+        "axes.spines.right":    False,
+        # Grid
+        "axes.grid":            True,
+        "grid.color":           BG_GRID,
+        "grid.linewidth":       1.0,
+        "grid.linestyle":       "-",
+        # Ticks
+        "xtick.color":          COL_TICK,
+        "ytick.color":          COL_TICK,
+        "xtick.labelsize":      10,
+        "ytick.labelsize":      10,
+        "xtick.major.size":     3,
+        "ytick.major.size":     3,
+        "xtick.major.pad":      5,
+        "ytick.major.pad":      5,
+        # Legend
+        "legend.fontsize":      10,
+        "legend.framealpha":    0.95,
+        "legend.edgecolor":     COL_EDGE,
+        "legend.fancybox":      False,
+        "legend.borderpad":     0.6,
+        "legend.labelspacing":  0.4,
+        # Lines
+        "lines.antialiased":    True,
+        # Misc
+        "axes.unicode_minus":   False,
+        "savefig.facecolor":    BG_PAGE,
+        "savefig.bbox":         "tight",
+        "savefig.pad_inches":   0.25,
+    })
+    return plt
+
+
+def _finish(fig, path: Path, plt) -> None:
+    """Save and close a figure."""
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Loss / PPL curve
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_metric_curve(
+    history: list[dict],
+    metric_prefix: str,
+    ylabel: str,
+    title: str,
+    path: Path,
+) -> None:
+    plt = get_pyplot(path)
+    steps  = [row["step"] for row in history]
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    use_log = False
+    if metric_prefix == "ppl":
+        finite = [
+            row[f"{split}_{metric_prefix}"]
+            for row in history
+            for split in ("train", "val", "test")
+            if not math.isnan(row[f"{split}_{metric_prefix}"])
+        ]
+        if finite and max(finite) / max(min(finite), 1e-9) > 20:
+            use_log = True
+
+    for split in ("train", "val", "test"):
+        key    = f"{split}_{metric_prefix}"
+        values = [row[key] for row in history]
+        color  = SPLIT_COLORS[split]
+        label  = SPLIT_LABELS[split]
+
+        ax.plot(
+            steps, values,
+            label=label,
+            color=color,
+            marker="o",
+            **MARKER_STYLE,
+            **LINE_STYLE,
+        )
+
+        # End-point label
+        last_v = values[-1]
+        label_text = f"{label}: {last_v:.3f}"
+        ax.annotate(
+            label_text,
+            xy=(steps[-1], last_v),
+            xytext=(10, 0),
+            textcoords="offset points",
+            va="center",
+            ha="left",
+            fontsize=9.5,
+            color=color,
+            fontweight="semibold",
+            annotation_clip=False,
+        )
+
+    if use_log:
+        ax.set_yscale("log")
+        ylabel = f"{ylabel} (log scale)"
+
+    ax.set_title(title)
+    ax.set_xlabel("Training step")
+    ax.set_ylabel(ylabel)
+
+    # Subtle fill under train curve
+    train_vals = [row[f"train_{metric_prefix}"] for row in history]
+    ax.fill_between(steps, train_vals, alpha=0.06, color=C_TRAIN)
+
+    ax.legend(loc="upper right", frameon=True)
+    ax.set_xlim(left=0)
+
+    # Right-margin space for end labels
+    x_range = steps[-1] - steps[0] if len(steps) > 1 else steps[0]
+    ax.set_xlim(right=steps[-1] + x_range * 0.14)
+
+    fig.tight_layout()
+    _finish(fig, path, plt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Top-N accuracy bar chart
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_topn_accuracy(top_rows: list[dict], path: Path) -> None:
+    plt = get_pyplot(path)
+    datasets   = ["train", "val", "test"]
+    top_values = sorted({int(row["top_n"]) for row in top_rows})
+    score_map  = {
+        (row["dataset"], int(row["top_n"])): float(row["accuracy"]) * 100
+        for row in top_rows
+    }
+
+    n_groups  = len(top_values)
+    n_splits  = len(datasets)
+    width     = 0.22
+    gap       = 0.06
+    positions = [i * (n_splits * (width + gap) + 0.3) for i in range(n_groups)]
+
+    fig, ax = plt.subplots(figsize=(max(9, n_groups * 3.5), 6))
+    all_scores: list[float] = []
+
+    for di, dataset in enumerate(datasets):
+        color  = SPLIT_COLORS[dataset]
+        label  = SPLIT_LABELS[dataset]
+        offset = [p + di * (width + gap) for p in positions]
+        scores = [score_map.get((dataset, k), float("nan")) for k in top_values]
+        plot_s = [0.0 if math.isnan(s) else s for s in scores]
+        all_scores.extend(plot_s)
+
+        bars = ax.bar(
+            offset, plot_s,
+            width=width,
+            label=label,
+            color=color,
+            alpha=0.88,
+            edgecolor="white",
+            linewidth=1.0,
+            zorder=3,
+        )
+        for bar, score in zip(bars, scores):
+            txt = "n/a" if math.isnan(score) else f"{score:.1f}%"
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.4,
+                txt,
+                ha="center", va="bottom",
+                fontsize=9, color=color, fontweight="semibold",
+            )
+
+    tick_centers = [p + (n_splits - 1) * (width + gap) / 2 for p in positions]
+    ax.set_xticks(tick_centers)
+    ax.set_xticklabels([f"Top-{k}" for k in top_values], fontsize=11)
+
+    max_s = max(all_scores) if all_scores else 0
+    ax.set_ylim(0, min(100, max(1.0, max_s * 1.25 + 1)))
+    ax.set_ylabel("Accuracy (%)")
+    ax.set_title("Top-N Next-Token Accuracy")
+    ax.legend(loc="upper left", frameon=True)
+    ax.set_axisbelow(True)
+
+    fig.tight_layout()
+    _finish(fig, path, plt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Best epoch / overfit diagnostic
+# ─────────────────────────────────────────────────────────────────────────────
+
+def plot_best_epoch_range(history: list[dict], path: Path) -> None:
+    plt = get_pyplot(path)
+    best      = min(history, key=lambda r: r["val_loss"])
+    threshold = best["val_loss"] * 1.01
+    near_best = [r for r in history if r["val_loss"] <= threshold]
+    first, last = near_best[0], near_best[-1]
+    overfit   = history[-1]["val_loss"] > best["val_loss"] * 1.02
+    steps     = [r["step"] for r in history]
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    # Near-best span
+    if first["step"] == last["step"]:
+        ax.axvline(best["step"], color=C_SPAN, linestyle="--", linewidth=2.0,
+                   label="best checkpoint", zorder=2)
+    else:
+        ax.axvspan(first["step"], last["step"], color=C_SPAN, alpha=0.18,
+                   label="within 1 % of best val", zorder=1)
+
+    # Loss curves
+    for split in ("train", "val", "test"):
+        vals  = [r[f"{split}_loss"] for r in history]
+        color = SPLIT_COLORS[split]
+        ax.plot(steps, vals,
+                label=SPLIT_LABELS[split],
+                color=color,
+                marker="o",
+                **MARKER_STYLE,
+                **LINE_STYLE,
+                zorder=3)
+        ax.fill_between(steps, vals, alpha=0.04, color=color)
+
+    # Best val marker
+    ax.scatter([best["step"]], [best["val_loss"]],
+               color=C_BEST, s=130, zorder=5,
+               edgecolors="white", linewidths=1.5,
+               label="best val loss")
+
+    ax.annotate(
+        f"Epoch {best['epoch']}  step {best['step']}\nval loss {best['val_loss']:.4f}",
+        xy=(best["step"], best["val_loss"]),
+        xytext=(28, 28),
+        textcoords="offset points",
+        arrowprops=dict(arrowstyle="->", color=C_BEST, lw=1.5),
+        bbox=dict(boxstyle="round,pad=0.5", fc="#F5F3FF", ec=C_BEST, alpha=0.95, lw=0.8),
+        fontsize=10,
+        color="#3B0764",
+        fontweight="semibold",
+    )
+
+    status_txt = "⚠ Overfitting detected" if overfit else "✓ No overfit signal"
+    status_col = "#B45309" if overfit else "#065F46"
+    status_bg  = "#FFFBEB" if overfit else "#ECFDF5"
+    status_ec  = "#FCD34D" if overfit else "#6EE7B7"
+
+    ax.text(
+        0.985, 0.04,
+        (
+            f"Recommended: epoch {best['epoch']} / step {best['step']}\n"
+            f"Near-best range: step {first['step']} – {last['step']}\n"
+            f"{status_txt}"
+        ),
+        transform=ax.transAxes,
+        ha="right", va="bottom",
+        fontsize=9.5,
+        color=status_col,
+        bbox=dict(boxstyle="round,pad=0.55", fc=status_bg,
+                  ec=status_ec, alpha=0.97, lw=0.8),
+    )
+
+    ax.set_title("Best Checkpoint & Overfit Diagnostic")
+    ax.set_xlabel("Training step")
+    ax.set_ylabel("Cross-entropy loss")
+    ax.legend(loc="upper right", frameon=True)
+    ax.set_xlim(left=0)
+
+    fig.tight_layout()
+    _finish(fig, path, plt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PNG table
+# ─────────────────────────────────────────────────────────────────────────────
+
+def is_png_safe_char(ch: str) -> bool:
+    code = ord(ch)
+    return (
+        0x20 <= code <= 0x7E
+        or 0x1100 <= code <= 0x11FF
+        or 0x3130 <= code <= 0x318F
+        or 0xAC00 <= code <= 0xD7A3
+        or ch in "·…\u201c\u201d\u2018\u2019"
+    )
+
+
+def wrap_table_cell(value, width: int = 32, max_lines: int = 5) -> str:
+    text = str(value).replace("\uFFFD", "?").replace("\n", " ")
+    text = "".join(ch if ch.isprintable() and is_png_safe_char(ch) else "?" for ch in text)
+    lines = textwrap.wrap(text, width=width, break_long_words=True) or [""]
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(".") + "…"
+    return "\n".join(lines)
+
+
+def write_png_table(
+    path: Path,
+    rows: list[dict],
+    title: str,
+    fieldnames: list[str] | None = None,
+    wrap_width: int = 32,
+    max_lines: int = 5,
+) -> None:
+    plt = get_pyplot(path)
+
+    if not rows:
+        fig, ax = plt.subplots(figsize=(8, 2.4))
+        ax.axis("off")
+        ax.set_title(title)
+        ax.text(0.5, 0.45, "No rows", ha="center", va="center", fontsize=12, color=COL_SUB)
+        fig.tight_layout()
+        _finish(fig, path, plt)
+        return
+
+    if fieldnames is None:
+        fieldnames = list(rows[0].keys())
+
+    cell_text = [
+        [wrap_table_cell(row.get(name, ""), width=wrap_width, max_lines=max_lines)
+         for name in fieldnames]
+        for row in rows
+    ]
+    row_heights = [
+        max(str(cell).count("\n") + 1 for cell in row)
+        for row in cell_text
+    ]
+
+    fig_w = min(max(9.0, len(fieldnames) * 2.0), 18.0)
+    fig_h = min(max(2.8, 1.2 + sum(max(1.0, h * 0.44) for h in row_heights)), 28.0)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.axis("off")
+    ax.set_title(title, pad=16)
+
+    table = ax.table(
+        cellText=cell_text,
+        colLabels=fieldnames,
+        cellLoc="left",
+        colLoc="left",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.05, 1.5)
+
+    # Alternate row colors
+    row_bg_even = "#FFFFFF"
+    row_bg_odd  = "#F8FAFC"
+    hdr_bg      = "#EEF2FF"
+    hdr_fg      = "#1E3A5F"
+
+    for (ri, ci), cell in table.get_celld().items():
+        cell.set_linewidth(0.5)
+        cell.set_edgecolor(COL_EDGE)
+        if ri == 0:
+            cell.set_facecolor(hdr_bg)
+            cell.set_text_props(weight="semibold", color=hdr_fg, fontsize=9.5)
+            cell.set_height(0.085)
+        else:
+            cell.set_facecolor(row_bg_even if ri % 2 == 1 else row_bg_odd)
+            cell.set_height(max(0.08, row_heights[ri - 1] * 0.052))
+
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.88, bottom=0.02)
+    _finish(fig, path, plt)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Unchanged utility / training functions
+# ─────────────────────────────────────────────────────────────────────────────
 
 def pick_device(name: str) -> torch.device:
     if name != "auto":
@@ -167,14 +608,14 @@ def print_summary(args: argparse.Namespace, train_losses: list[float], val_losse
         return
 
     last_train = train_losses[-1]
-    last_val = val_losses[-1]
-    best_val = min(val_losses)
+    last_val   = val_losses[-1]
+    best_val   = min(val_losses)
     print(f"Eval points: {len(train_losses)}")
     print(f"Final train loss: {last_train:.3f}")
-    print(f"Final val loss: {last_val:.3f}")
-    print(f"Best val loss: {best_val:.3f}")
+    print(f"Final val loss:   {last_val:.3f}")
+    print(f"Best val loss:    {best_val:.3f}")
     print(f"Final val perplexity: {math.exp(last_val):.2f}")
-    print(f"Best val perplexity: {math.exp(best_val):.2f}")
+    print(f"Best val perplexity:  {math.exp(best_val):.2f}")
 
 
 def save_run_config(
@@ -294,283 +735,6 @@ def write_markdown_table(path: Path, rows: list[dict], fieldnames: list[str] | N
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def get_pyplot(path: Path):
-    mpl_config_root = path.parent.parent if path.parent.name.startswith("pretrain_") else path.parent
-    mpl_config_dir = mpl_config_root / ".matplotlib"
-    mpl_config_dir.mkdir(exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(mpl_config_dir))
-
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    try:
-        from matplotlib import font_manager
-
-        available_fonts = {font.name for font in font_manager.fontManager.ttflist}
-        for font_name in ["AppleGothic", "NanumGothic", "Malgun Gothic"]:
-            if font_name in available_fonts:
-                plt.rcParams["font.family"] = font_name
-                break
-    except Exception:
-        pass
-    plt.rcParams.update({
-        "figure.facecolor": "#f8fafc",
-        "axes.facecolor": "#ffffff",
-        "axes.edgecolor": "#cbd5e1",
-        "axes.labelcolor": "#111827",
-        "axes.labelsize": 13,
-        "axes.titlesize": 17,
-        "axes.titleweight": "bold",
-        "xtick.color": "#334155",
-        "ytick.color": "#334155",
-        "xtick.labelsize": 11,
-        "ytick.labelsize": 11,
-        "legend.fontsize": 11,
-        "grid.color": "#cbd5e1",
-    })
-    plt.rcParams["axes.unicode_minus"] = False
-    return plt
-
-
-def plot_metric_curve(history: list[dict], metric_prefix: str, ylabel: str, title: str, path: Path) -> None:
-    plt = get_pyplot(path)
-
-    steps = [row["step"] for row in history]
-    fig, ax = plt.subplots(figsize=(13, 7))
-    for split, color in [("train", "#2563eb"), ("val", "#dc2626"), ("test", "#059669")]:
-        key = f"{split}_{metric_prefix}"
-        values = [row[key] for row in history]
-        ax.plot(steps, values, label=split, linewidth=2.8, color=color, marker="o", markersize=5)
-        ax.annotate(
-            f"{split}: {values[-1]:.3f}",
-            xy=(steps[-1], values[-1]),
-            xytext=(8, 0),
-            textcoords="offset points",
-            va="center",
-            fontsize=10,
-            color=color,
-            fontweight="bold",
-        )
-    ax.set_title(title, pad=16)
-    ax.set_xlabel("Training step")
-    ax.set_ylabel(ylabel)
-    if metric_prefix == "ppl":
-        finite_values = [
-            row[f"{split}_{metric_prefix}"]
-            for row in history
-            for split in ["train", "val", "test"]
-            if not math.isnan(row[f"{split}_{metric_prefix}"])
-        ]
-        if finite_values and max(finite_values) / max(min(finite_values), 1e-9) > 20:
-            ax.set_yscale("log")
-            ax.set_ylabel(f"{ylabel} (log scale)")
-    ax.grid(True, axis="y", alpha=0.6)
-    ax.legend(loc="best", frameon=True)
-    fig.tight_layout()
-    fig.savefig(path, dpi=200)
-    plt.close(fig)
-
-
-def is_png_safe_char(ch: str) -> bool:
-    code = ord(ch)
-    return (
-        0x20 <= code <= 0x7E
-        or 0x1100 <= code <= 0x11FF
-        or 0x3130 <= code <= 0x318F
-        or 0xAC00 <= code <= 0xD7A3
-        or ch in "·…“”‘’"
-    )
-
-
-def wrap_table_cell(value, width: int = 32, max_lines: int = 5) -> str:
-    text = str(value).replace("\uFFFD", "?").replace("\n", " ")
-    text = "".join(ch if ch.isprintable() and is_png_safe_char(ch) else "?" for ch in text)
-    lines = textwrap.wrap(text, width=width, break_long_words=True) or [""]
-    if len(lines) > max_lines:
-        lines = lines[:max_lines]
-        lines[-1] = lines[-1].rstrip(".") + "..."
-    return "\n".join(lines)
-
-
-def write_png_table(
-    path: Path,
-    rows: list[dict],
-    title: str,
-    fieldnames: list[str] | None = None,
-    wrap_width: int = 32,
-    max_lines: int = 5,
-) -> None:
-    plt = get_pyplot(path)
-    if not rows:
-        fig, ax = plt.subplots(figsize=(8, 2.4))
-        ax.axis("off")
-        ax.set_title(title, fontsize=15, fontweight="bold", pad=12)
-        ax.text(0.5, 0.45, "No rows", ha="center", va="center", fontsize=12)
-        fig.tight_layout()
-        fig.savefig(path, dpi=180, bbox_inches="tight")
-        plt.close(fig)
-        return
-
-    if fieldnames is None:
-        fieldnames = list(rows[0].keys())
-    cell_text = [
-        [wrap_table_cell(row.get(name, ""), width=wrap_width, max_lines=max_lines) for name in fieldnames]
-        for row in rows
-    ]
-    row_heights = [
-        max(str(cell).count("\n") + 1 for cell in row)
-        for row in cell_text
-    ]
-    fig_width = min(max(8.5, len(fieldnames) * 2.2), 18)
-    fig_height = min(max(2.8, 1.0 + sum(max(1.0, lines * 0.42) for lines in row_heights)), 28)
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-    ax.axis("off")
-    ax.set_title(title, fontsize=15, fontweight="bold", pad=14)
-
-    table = ax.table(
-        cellText=cell_text,
-        colLabels=fieldnames,
-        cellLoc="left",
-        colLoc="left",
-        loc="center",
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1.05, 1.45)
-
-    for (row_idx, _col_idx), cell in table.get_celld().items():
-        if row_idx == 0:
-            cell.set_facecolor("#e5e7eb")
-            cell.set_text_props(weight="bold", color="#111827")
-            cell.set_height(0.08)
-        else:
-            cell.set_facecolor("#ffffff" if row_idx % 2 else "#f9fafb")
-            cell.set_height(max(0.08, row_heights[row_idx - 1] * 0.05))
-        cell.set_edgecolor("#d1d5db")
-
-    fig.subplots_adjust(left=0.02, right=0.98, top=0.9, bottom=0.02)
-    fig.savefig(path, dpi=180, bbox_inches="tight")
-    plt.close(fig)
-
-
-def plot_topn_accuracy(top_rows: list[dict], path: Path) -> None:
-    plt = get_pyplot(path)
-    datasets = ["train", "val", "test"]
-    top_values = sorted({int(row["top_n"]) for row in top_rows})
-    score_map = {
-        (row["dataset"], int(row["top_n"])): float(row["accuracy"]) * 100
-        for row in top_rows
-    }
-    colors = {"train": "#2563eb", "val": "#dc2626", "test": "#059669"}
-    width = 0.24
-    x_positions = list(range(len(top_values)))
-    fig, ax = plt.subplots(figsize=(12.5, 7))
-
-    all_scores = []
-    for dataset_idx, dataset in enumerate(datasets):
-        offsets = [x + (dataset_idx - 1) * width for x in x_positions]
-        scores = [score_map.get((dataset, top_n), float("nan")) for top_n in top_values]
-        plot_scores = [0 if math.isnan(score) else score for score in scores]
-        all_scores.extend(plot_scores)
-        bars = ax.bar(
-            offsets,
-            plot_scores,
-            width=width,
-            label=dataset,
-            color=colors[dataset],
-            alpha=0.9,
-            edgecolor="#ffffff",
-            linewidth=1.2,
-        )
-        for bar, score in zip(bars, scores):
-            label = "nan" if math.isnan(score) else f"{score:.2f}%"
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height(),
-                label,
-                ha="center",
-                va="bottom",
-                fontsize=10,
-                color=colors[dataset],
-                fontweight="bold",
-            )
-
-    max_score = max(all_scores) if all_scores else 0
-    ax.set_ylim(0, min(100, max(1.0, max_score * 1.28 + 0.5)))
-    ax.set_xticks(x_positions)
-    ax.set_xticklabels([f"Top-{top_n}" for top_n in top_values])
-    ax.set_ylabel("Accuracy (%)")
-    ax.set_title("Top-N Accuracy by Dataset", pad=16)
-    ax.grid(True, axis="y", alpha=0.55)
-    ax.legend(loc="upper left", frameon=True)
-    fig.tight_layout()
-    fig.savefig(path, dpi=200)
-    plt.close(fig)
-
-
-def plot_best_epoch_range(history: list[dict], path: Path) -> None:
-    plt = get_pyplot(path)
-    best = min(history, key=lambda row: row["val_loss"])
-    threshold = best["val_loss"] * 1.01
-    near_best = [row for row in history if row["val_loss"] <= threshold]
-    first = near_best[0]
-    last = near_best[-1]
-    overfit_flag = history[-1]["val_loss"] > best["val_loss"] * 1.02
-    steps = [row["step"] for row in history]
-    colors = {"train": "#2563eb", "val": "#dc2626", "test": "#059669"}
-
-    fig, ax = plt.subplots(figsize=(13, 7))
-    for split in ["train", "val", "test"]:
-        key = f"{split}_loss"
-        ax.plot(
-            steps,
-            [row[key] for row in history],
-            label=f"{split} loss",
-            color=colors[split],
-            linewidth=2.8,
-            marker="o",
-            markersize=5,
-        )
-
-    if first["step"] == last["step"]:
-        ax.axvline(best["step"], color="#f59e0b", linestyle="--", linewidth=2.5, label="best range")
-    else:
-        ax.axvspan(first["step"], last["step"], color="#f59e0b", alpha=0.18, label="within 1% of best val")
-    ax.scatter([best["step"]], [best["val_loss"]], color="#7c3aed", s=140, zorder=5, label="best val loss")
-    ax.annotate(
-        f"Best epoch {best['epoch']}\nstep {best['step']}\nval loss {best['val_loss']:.3f}",
-        xy=(best["step"], best["val_loss"]),
-        xytext=(24, 28),
-        textcoords="offset points",
-        arrowprops={"arrowstyle": "->", "color": "#7c3aed", "linewidth": 1.8},
-        bbox={"boxstyle": "round,pad=0.45", "fc": "#f5f3ff", "ec": "#7c3aed", "alpha": 0.95},
-        fontsize=11,
-        color="#312e81",
-        fontweight="bold",
-    )
-    status = "Overfit signal: yes" if overfit_flag else "Overfit signal: no"
-    ax.text(
-        0.99,
-        0.03,
-        f"Recommended: epoch {best['epoch']} / step {best['step']}\nNear-best: step {first['step']} ~ {last['step']}\n{status}",
-        transform=ax.transAxes,
-        ha="right",
-        va="bottom",
-        fontsize=11,
-        bbox={"boxstyle": "round,pad=0.5", "fc": "#ffffff", "ec": "#cbd5e1", "alpha": 0.95},
-    )
-    ax.set_title("Best Epoch / Overfit Check", pad=16)
-    ax.set_xlabel("Training step")
-    ax.set_ylabel("Cross-entropy loss")
-    ax.grid(True, axis="y", alpha=0.55)
-    ax.legend(loc="best", frameon=True)
-    fig.tight_layout()
-    fig.savefig(path, dpi=200)
-    plt.close(fig)
-
-
 def compute_topk_accuracy(
     model: GPTModel,
     data_loader,
@@ -578,22 +742,22 @@ def compute_topk_accuracy(
     top_k_values: list[int],
     num_batches: int | None,
 ) -> dict[int, float]:
-    max_k = max(top_k_values)
+    max_k   = max(top_k_values)
     correct = {k: 0 for k in top_k_values}
-    total = 0
+    total   = 0
 
     model.eval()
     with torch.no_grad():
         for batch_idx, (input_batch, target_batch) in enumerate(data_loader):
             if num_batches is not None and batch_idx >= num_batches:
                 break
-            input_batch = input_batch.to(device)
+            input_batch  = input_batch.to(device)
             target_batch = target_batch.to(device)
-            logits = model(input_batch)
-            _, top_indices = torch.topk(logits, k=max_k, dim=-1)
-            target = target_batch.unsqueeze(-1)
+            logits       = model(input_batch)
+            _, top_idx   = torch.topk(logits, k=max_k, dim=-1)
+            target       = target_batch.unsqueeze(-1)
             for k in top_k_values:
-                correct[k] += top_indices[..., :k].eq(target).any(dim=-1).sum().item()
+                correct[k] += top_idx[..., :k].eq(target).any(dim=-1).sum().item()
             total += target_batch.numel()
 
     model.train()
@@ -632,42 +796,41 @@ def generate_sample_text(
 
 
 def make_best_epoch_rows(history: list[dict]) -> list[dict]:
-    best = min(history, key=lambda row: row["val_loss"])
+    best      = min(history, key=lambda r: r["val_loss"])
     threshold = best["val_loss"] * 1.01
-    near_best = [row for row in history if row["val_loss"] <= threshold]
-    first = near_best[0]
-    last = near_best[-1]
-    overfit_flag = history[-1]["val_loss"] > best["val_loss"] * 1.02
+    near_best = [r for r in history if r["val_loss"] <= threshold]
+    first, last = near_best[0], near_best[-1]
+    overfit   = history[-1]["val_loss"] > best["val_loss"] * 1.02
     return [
         {
-            "metric": "best_val_loss",
-            "epoch": best["epoch"],
-            "step": best["step"],
+            "metric":   "best_val_loss",
+            "epoch":    best["epoch"],
+            "step":     best["step"],
             "train_loss": f"{best['train_loss']:.6f}",
-            "val_loss": f"{best['val_loss']:.6f}",
-            "test_loss": f"{best['test_loss']:.6f}",
-            "val_ppl": f"{best['val_ppl']:.6f}",
-            "note": "recommended checkpoint",
+            "val_loss":   f"{best['val_loss']:.6f}",
+            "test_loss":  f"{best['test_loss']:.6f}",
+            "val_ppl":    f"{best['val_ppl']:.6f}",
+            "note":     "recommended checkpoint",
         },
         {
-            "metric": "near_best_1_percent_start",
-            "epoch": first["epoch"],
-            "step": first["step"],
+            "metric":   "near_best_1_percent_start",
+            "epoch":    first["epoch"],
+            "step":     first["step"],
             "train_loss": f"{first['train_loss']:.6f}",
-            "val_loss": f"{first['val_loss']:.6f}",
-            "test_loss": f"{first['test_loss']:.6f}",
-            "val_ppl": f"{first['val_ppl']:.6f}",
-            "note": "first eval within 1% of best val loss",
+            "val_loss":   f"{first['val_loss']:.6f}",
+            "test_loss":  f"{first['test_loss']:.6f}",
+            "val_ppl":    f"{first['val_ppl']:.6f}",
+            "note":     "first eval within 1% of best val loss",
         },
         {
-            "metric": "near_best_1_percent_end",
-            "epoch": last["epoch"],
-            "step": last["step"],
+            "metric":   "near_best_1_percent_end",
+            "epoch":    last["epoch"],
+            "step":     last["step"],
             "train_loss": f"{last['train_loss']:.6f}",
-            "val_loss": f"{last['val_loss']:.6f}",
-            "test_loss": f"{last['test_loss']:.6f}",
-            "val_ppl": f"{last['val_ppl']:.6f}",
-            "note": f"overfit_flag={overfit_flag}",
+            "val_loss":   f"{last['val_loss']:.6f}",
+            "test_loss":  f"{last['test_loss']:.6f}",
+            "val_ppl":    f"{last['val_ppl']:.6f}",
+            "note":     f"overfit_flag={overfit}",
         },
     ]
 
@@ -692,121 +855,121 @@ def write_training_results(
     if not history:
         raise ValueError("No metric history to write.")
 
-    run_dir = make_results_run_dir(args.results_dir)
+    run_dir     = make_results_run_dir(args.results_dir)
     report_iter = args.report_eval_iter if args.report_eval_iter is not None else args.eval_iter
     top_k_values = parse_top_k_values(args.top_k)
 
-    history_rows = []
-    for row in history:
-        history_rows.append({
-            "epoch": row["epoch"],
-            "step": row["step"],
+    # ── metrics_history ───────────────────────────────────────────────────────
+    history_rows = [
+        {
+            "epoch":      row["epoch"],
+            "step":       row["step"],
             "train_loss": f"{row['train_loss']:.6f}",
-            "val_loss": f"{row['val_loss']:.6f}",
-            "test_loss": f"{row['test_loss']:.6f}",
-            "train_ppl": f"{row['train_ppl']:.6f}",
-            "val_ppl": f"{row['val_ppl']:.6f}",
-            "test_ppl": f"{row['test_ppl']:.6f}",
-        })
+            "val_loss":   f"{row['val_loss']:.6f}",
+            "test_loss":  f"{row['test_loss']:.6f}",
+            "train_ppl":  f"{row['train_ppl']:.6f}",
+            "val_ppl":    f"{row['val_ppl']:.6f}",
+            "test_ppl":   f"{row['test_ppl']:.6f}",
+        }
+        for row in history
+    ]
     write_csv(run_dir / "metrics_history.csv", history_rows)
     write_png_table(run_dir / "metrics_history.png", history_rows, "Metrics History")
 
-    plot_metric_curve(history, "loss", "Cross-entropy loss", "Train / Val / Test Loss", run_dir / "loss_curve.png")
-    plot_metric_curve(history, "ppl", "Perplexity", "Train / Val / Test Perplexity", run_dir / "perplexity_curve.png")
+    # ── curves ────────────────────────────────────────────────────────────────
+    plot_metric_curve(history, "loss", "Cross-entropy loss",
+                      "Train / Val / Test — Loss", run_dir / "loss_curve.png")
+    plot_metric_curve(history, "ppl", "Perplexity",
+                      "Train / Val / Test — Perplexity", run_dir / "perplexity_curve.png")
 
+    # ── top-N accuracy ────────────────────────────────────────────────────────
     top_rows = []
     for split, loader in [("train", train_loader), ("val", val_loader), ("test", test_loader)]:
         scores = compute_topk_accuracy(model, loader, device, top_k_values, report_iter)
         for k in top_k_values:
-            top_rows.append({
-                "dataset": split,
-                "top_n": k,
-                "accuracy": f"{scores[k]:.6f}",
-            })
+            top_rows.append({"dataset": split, "top_n": k, "accuracy": f"{scores[k]:.6f}"})
     write_csv(run_dir / "top_n_accuracy.csv", top_rows)
     write_markdown_table(run_dir / "top_n_accuracy.md", top_rows)
     plot_topn_accuracy(top_rows, run_dir / "top_n_accuracy.png")
 
+    # ── best epoch ────────────────────────────────────────────────────────────
     best_rows = make_best_epoch_rows(history)
     write_csv(run_dir / "best_epoch_range.csv", best_rows)
     write_markdown_table(run_dir / "best_epoch_range.md", best_rows)
     plot_best_epoch_range(history, run_dir / "best_epoch_range.png")
 
+    # ── sample outputs ────────────────────────────────────────────────────────
     prompt_rows = [
         {"source": "start_context", "prompt": args.start_context[:80]},
-        {"source": "train_sample", "prompt": train_text[:80].replace("\n", " ")},
-        {"source": "val_sample", "prompt": val_text[:80].replace("\n", " ")},
-        {"source": "test_sample", "prompt": test_text[:80].replace("\n", " ")},
+        {"source": "train_sample",  "prompt": train_text[:80].replace("\n", " ")},
+        {"source": "val_sample",    "prompt": val_text[:80].replace("\n", " ")},
+        {"source": "test_sample",   "prompt": test_text[:80].replace("\n", " ")},
     ]
-    sample_rows = []
-    for row in prompt_rows:
-        sample_rows.append({
+    sample_rows = [
+        {
             "source": row["source"],
-            "input": row["prompt"],
+            "input":  row["prompt"],
             "output": generate_sample_text(
-                model=model,
-                tokenizer=tokenizer,
-                prompt=row["prompt"],
-                device=device,
+                model=model, tokenizer=tokenizer,
+                prompt=row["prompt"], device=device,
                 context_length=args.context_length,
                 max_new_tokens=args.report_sample_tokens,
             ),
-        })
+        }
+        for row in prompt_rows
+    ]
     write_csv(run_dir / "sample_outputs.csv", sample_rows)
     write_markdown_table(run_dir / "sample_outputs.md", sample_rows)
-    write_png_table(
-        run_dir / "sample_outputs.png",
-        sample_rows,
-        "Input / Output Samples",
-        wrap_width=42,
-        max_lines=7,
-    )
+    write_png_table(run_dir / "sample_outputs.png", sample_rows,
+                    "Input / Output Samples", wrap_width=42, max_lines=7)
 
+    # ── summary ───────────────────────────────────────────────────────────────
     final = history[-1]
-    best = min(history, key=lambda row: row["val_loss"])
+    best  = min(history, key=lambda r: r["val_loss"])
     summary_rows = [
-        {"item": "result_dir", "value": str(run_dir)},
-        {"item": "train_path", "value": str(args.train_path)},
-        {"item": "val_path", "value": str(args.val_path)},
-        {"item": "test_path", "value": str(args.test_path)},
-        {"item": "tokenizer_path", "value": str(args.tokenizer_path)},
-        {"item": "tokenizer_mode", "value": getattr(args, "tokenizer_mode", "unknown")},
-        {"item": "device", "value": str(device)},
-        {"item": "num_params", "value": num_params},
-        {"item": "train_chars", "value": len(train_text)},
-        {"item": "val_chars", "value": len(val_text)},
-        {"item": "test_chars", "value": len(test_text)},
-        {"item": "train_tokens", "value": len(train_ids)},
-        {"item": "val_tokens", "value": len(val_ids)},
-        {"item": "test_tokens", "value": len(test_ids)},
-        {"item": "vocab_size", "value": len(tokenizer.id_to_token)},
-        {"item": "context_length", "value": args.context_length},
-        {"item": "emb_dim", "value": args.emb_dim},
-        {"item": "n_heads", "value": args.n_heads},
-        {"item": "n_layers", "value": args.n_layers},
-        {"item": "drop_rate", "value": args.drop_rate},
-        {"item": "batch_size", "value": args.batch_size},
-        {"item": "epochs", "value": args.epochs},
-        {"item": "lr", "value": args.lr},
-        {"item": "eval_freq", "value": args.eval_freq},
-        {"item": "eval_iter", "value": args.eval_iter},
-        {"item": "final_step", "value": final["step"]},
-        {"item": "final_train_loss", "value": f"{final['train_loss']:.6f}"},
-        {"item": "final_val_loss", "value": f"{final['val_loss']:.6f}"},
-        {"item": "final_test_loss", "value": f"{final['test_loss']:.6f}"},
-        {"item": "final_train_ppl", "value": f"{final['train_ppl']:.6f}"},
-        {"item": "final_val_ppl", "value": f"{final['val_ppl']:.6f}"},
-        {"item": "final_test_ppl", "value": f"{final['test_ppl']:.6f}"},
-        {"item": "best_epoch", "value": best["epoch"]},
-        {"item": "best_step", "value": best["step"]},
-        {"item": "best_val_loss", "value": f"{best['val_loss']:.6f}"},
-        {"item": "best_val_ppl", "value": f"{best['val_ppl']:.6f}"},
+        {"item": "result_dir",        "value": str(run_dir)},
+        {"item": "train_path",        "value": str(args.train_path)},
+        {"item": "val_path",          "value": str(args.val_path)},
+        {"item": "test_path",         "value": str(args.test_path)},
+        {"item": "tokenizer_path",    "value": str(args.tokenizer_path)},
+        {"item": "tokenizer_mode",    "value": getattr(args, "tokenizer_mode", "unknown")},
+        {"item": "device",            "value": str(device)},
+        {"item": "num_params",        "value": num_params},
+        {"item": "train_chars",       "value": len(train_text)},
+        {"item": "val_chars",         "value": len(val_text)},
+        {"item": "test_chars",        "value": len(test_text)},
+        {"item": "train_tokens",      "value": len(train_ids)},
+        {"item": "val_tokens",        "value": len(val_ids)},
+        {"item": "test_tokens",       "value": len(test_ids)},
+        {"item": "vocab_size",        "value": len(tokenizer.id_to_token)},
+        {"item": "context_length",    "value": args.context_length},
+        {"item": "emb_dim",           "value": args.emb_dim},
+        {"item": "n_heads",           "value": args.n_heads},
+        {"item": "n_layers",          "value": args.n_layers},
+        {"item": "drop_rate",         "value": args.drop_rate},
+        {"item": "batch_size",        "value": args.batch_size},
+        {"item": "epochs",            "value": args.epochs},
+        {"item": "lr",                "value": args.lr},
+        {"item": "eval_freq",         "value": args.eval_freq},
+        {"item": "eval_iter",         "value": args.eval_iter},
+        {"item": "final_step",        "value": final["step"]},
+        {"item": "final_train_loss",  "value": f"{final['train_loss']:.6f}"},
+        {"item": "final_val_loss",    "value": f"{final['val_loss']:.6f}"},
+        {"item": "final_test_loss",   "value": f"{final['test_loss']:.6f}"},
+        {"item": "final_train_ppl",   "value": f"{final['train_ppl']:.6f}"},
+        {"item": "final_val_ppl",     "value": f"{final['val_ppl']:.6f}"},
+        {"item": "final_test_ppl",    "value": f"{final['test_ppl']:.6f}"},
+        {"item": "best_epoch",        "value": best["epoch"]},
+        {"item": "best_step",         "value": best["step"]},
+        {"item": "best_val_loss",     "value": f"{best['val_loss']:.6f}"},
+        {"item": "best_val_ppl",      "value": f"{best['val_ppl']:.6f}"},
     ]
     write_csv(run_dir / "summary.csv", summary_rows)
     write_markdown_table(run_dir / "summary.md", summary_rows)
-    write_png_table(run_dir / "summary.png", summary_rows, "Training Summary", wrap_width=48, max_lines=4)
+    write_png_table(run_dir / "summary.png", summary_rows, "Training Summary",
+                    wrap_width=48, max_lines=4)
     (run_dir / "summary.json").write_text(
-        json.dumps({row["item"]: row["value"] for row in summary_rows}, ensure_ascii=False, indent=2),
+        json.dumps({r["item"]: r["value"] for r in summary_rows}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
@@ -814,38 +977,43 @@ def write_training_results(
     return run_dir
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ─────────────────────────────────────────────────────────────────────────────
+
 def main() -> None:
     args = parse_args()
     if args.smoke:
-        args.vocab_size = min(args.vocab_size, 300)
-        args.tokenizer_path = args.output_dir / f"bpe_vocab_{args.vocab_size}_smoke.json"
+        args.vocab_size      = min(args.vocab_size, 300)
+        args.tokenizer_path  = args.output_dir / f"bpe_vocab_{args.vocab_size}_smoke.json"
         args.max_train_chars = args.max_train_chars or 3_000
-        args.max_val_chars = args.max_val_chars or 1_000
-        args.max_test_chars = args.max_test_chars or 1_000
-        args.context_length = min(args.context_length, 32)
-        args.emb_dim = min(args.emb_dim, 32)
-        args.n_layers = 1
-        args.epochs = 1
-        args.batch_size = min(args.batch_size, 2)
-        args.eval_freq = min(args.eval_freq, 20)
-        args.eval_iter = min(args.eval_iter, 1)
-        args.ckpt_freq = 0
+        args.max_val_chars   = args.max_val_chars   or 1_000
+        args.max_test_chars  = args.max_test_chars  or 1_000
+        args.context_length  = min(args.context_length, 32)
+        args.emb_dim         = min(args.emb_dim, 32)
+        args.n_layers        = 1
+        args.epochs          = 1
+        args.batch_size      = min(args.batch_size, 2)
+        args.eval_freq       = min(args.eval_freq, 20)
+        args.eval_iter       = min(args.eval_iter, 1)
+        args.ckpt_freq       = 0
 
     train_text = read_text(args.train_path, args.max_train_chars)
-    val_text = read_text(args.val_path, args.max_val_chars)
+    val_text   = read_text(args.val_path,   args.max_val_chars)
     if args.test_path.exists():
         test_text = read_text(args.test_path, args.max_test_chars)
     else:
         print(f"Test path not found: {args.test_path}. Using validation text as test text.")
         test_text = val_text
+
     print(f"Train path: {args.train_path}")
-    print(f"Val path: {args.val_path}")
-    print(f"Test path: {args.test_path}")
+    print(f"Val path:   {args.val_path}")
+    print(f"Test path:  {args.test_path}")
     tokenizer = build_tokenizer(args, train_text)
 
     train_ids = tokenizer.encode(train_text)
-    val_ids = tokenizer.encode(val_text)
-    test_ids = tokenizer.encode(test_text)
+    val_ids   = tokenizer.encode(val_text)
+    test_ids  = tokenizer.encode(test_text)
     if (
         len(train_ids) <= args.context_length
         or len(val_ids) <= args.context_length
@@ -853,76 +1021,44 @@ def main() -> None:
     ):
         raise ValueError("Not enough tokens for the chosen context length.")
 
-    train_loader = create_dataloader(
-        train_ids,
-        context_length=args.context_length,
-        batch_size=args.batch_size,
-        stride=args.stride,
-        drop_last=True,
-        shuffle=True,
-        num_workers=args.num_workers,
-    )
-    val_loader = create_dataloader(
-        val_ids,
-        context_length=args.context_length,
-        batch_size=args.batch_size,
-        stride=args.stride,
-        drop_last=False,
-        shuffle=False,
-        num_workers=args.num_workers,
-    )
-    test_loader = create_dataloader(
-        test_ids,
-        context_length=args.context_length,
-        batch_size=args.batch_size,
-        stride=args.stride,
-        drop_last=False,
-        shuffle=False,
-        num_workers=args.num_workers,
-    )
+    loader_kwargs = dict(context_length=args.context_length, batch_size=args.batch_size,
+                         stride=args.stride, num_workers=args.num_workers)
+    train_loader = create_dataloader(train_ids, drop_last=True,  shuffle=True,  **loader_kwargs)
+    val_loader   = create_dataloader(val_ids,   drop_last=False, shuffle=False, **loader_kwargs)
+    test_loader  = create_dataloader(test_ids,  drop_last=False, shuffle=False, **loader_kwargs)
 
     config = {
-        "vocab_size": len(tokenizer.id_to_token),
+        "vocab_size":     len(tokenizer.id_to_token),
         "context_length": args.context_length,
-        "emb_dim": args.emb_dim,
-        "n_heads": args.n_heads,
-        "n_layers": args.n_layers,
-        "drop_rate": args.drop_rate,
-        "qkv_bias": False,
+        "emb_dim":        args.emb_dim,
+        "n_heads":        args.n_heads,
+        "n_layers":       args.n_layers,
+        "drop_rate":      args.drop_rate,
+        "qkv_bias":       False,
     }
-    model = GPTModel(config)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
+    model     = GPTModel(config)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    device    = pick_device(args.device)
 
-    device = pick_device(args.device)
-    start_epoch = 0
-    global_step = 0
+    start_epoch  = 0
+    global_step  = 0
     if args.resume is not None:
         start_epoch, global_step = load_checkpoint(model, optimizer, args.resume, device)
         print(f"Resumed from {args.resume}: epoch={start_epoch}, step={global_step}")
 
     num_params = sum(p.numel() for p in model.parameters())
-    print(f"Device: {device}")
+    print(f"Device:        {device}")
     print(f"Tokenizer vocab: {config['vocab_size']}")
-    print(f"Model params: {num_params:,}")
+    print(f"Model params:  {num_params:,}")
     print(f"Batches: train={len(train_loader):,}, val={len(val_loader):,}, test={len(test_loader):,}")
+
     save_run_config(
         args=args,
-        train_text=train_text,
-        val_text=val_text,
-        test_text=test_text,
-        train_ids=train_ids,
-        val_ids=val_ids,
-        test_ids=test_ids,
-        train_batches=len(train_loader),
-        val_batches=len(val_loader),
+        train_text=train_text, val_text=val_text, test_text=test_text,
+        train_ids=train_ids,   val_ids=val_ids,   test_ids=test_ids,
+        train_batches=len(train_loader), val_batches=len(val_loader),
         test_batches=len(test_loader),
-        model_config=config,
-        num_params=num_params,
-        device=device,
+        model_config=config, num_params=num_params, device=device,
     )
 
     metric_history: list[dict] = []
@@ -932,14 +1068,14 @@ def main() -> None:
         test_loss = calc_loss_loader(test_loader, model, device, num_batches=args.eval_iter)
         model.train()
         metric_history.append({
-            "epoch": epoch,
-            "step": step,
+            "epoch":      epoch,
+            "step":       step,
             "train_loss": train_loss,
-            "val_loss": val_loss,
-            "test_loss": test_loss,
-            "train_ppl": safe_ppl(train_loss),
-            "val_ppl": safe_ppl(val_loss),
-            "test_ppl": safe_ppl(test_loss),
+            "val_loss":   val_loss,
+            "test_loss":  test_loss,
+            "train_ppl":  safe_ppl(train_loss),
+            "val_ppl":    safe_ppl(val_loss),
+            "test_ppl":   safe_ppl(test_loss),
         })
         print(f"테스트 손실 {test_loss:.3f}")
 
@@ -970,35 +1106,26 @@ def main() -> None:
     if not metric_history:
         model.eval()
         train_loss = calc_loss_loader(train_loader, model, device, num_batches=args.eval_iter)
-        val_loss = calc_loss_loader(val_loader, model, device, num_batches=args.eval_iter)
-        test_loss = calc_loss_loader(test_loader, model, device, num_batches=args.eval_iter)
+        val_loss   = calc_loss_loader(val_loader,   model, device, num_batches=args.eval_iter)
+        test_loss  = calc_loss_loader(test_loader,  model, device, num_batches=args.eval_iter)
         model.train()
         metric_history.append({
-            "epoch": start_epoch + args.epochs,
-            "step": final_step,
+            "epoch":      start_epoch + args.epochs,
+            "step":       final_step,
             "train_loss": train_loss,
-            "val_loss": val_loss,
-            "test_loss": test_loss,
-            "train_ppl": safe_ppl(train_loss),
-            "val_ppl": safe_ppl(val_loss),
-            "test_ppl": safe_ppl(test_loss),
+            "val_loss":   val_loss,
+            "test_loss":  test_loss,
+            "train_ppl":  safe_ppl(train_loss),
+            "val_ppl":    safe_ppl(val_loss),
+            "test_ppl":   safe_ppl(test_loss),
         })
 
     write_training_results(
-        args=args,
-        model=model,
-        tokenizer=tokenizer,
-        device=device,
+        args=args, model=model, tokenizer=tokenizer, device=device,
         history=metric_history,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        test_loader=test_loader,
-        train_text=train_text,
-        val_text=val_text,
-        test_text=test_text,
-        train_ids=train_ids,
-        val_ids=val_ids,
-        test_ids=test_ids,
+        train_loader=train_loader, val_loader=val_loader, test_loader=test_loader,
+        train_text=train_text, val_text=val_text, test_text=test_text,
+        train_ids=train_ids, val_ids=val_ids, test_ids=test_ids,
         num_params=num_params,
     )
     print_summary(args, train_losses, val_losses)
@@ -1006,3 +1133,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
