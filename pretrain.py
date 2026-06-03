@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
 
@@ -17,29 +18,31 @@ from src.train import load_checkpoint, save_checkpoint, train_model
 ROOT = Path(__file__).resolve().parent
 
 DEFAULT_HYPERPARAMS = {
+    #기본 파라미터:vocab_size:3000, epoch:10, context_length:128, 
+    #corphus:1,500,000, emb_dim:128, layer:2, lr:3e-4, batch_size:
     "train_path": ROOT / "data" / "nsmc_lm_train.txt",
     "val_path": ROOT / "data" / "nsmc_lm_val.txt",
-    "tokenizer_path": ROOT / "checkpoints" / "bpe_vocab_3000.json",
-    "output_dir": ROOT / "checkpoints",
-    "vocab_size": 3000, #vocab_size=3000, 
-    "context_length": 128, #context_length=128
+    "tokenizer_path": None,
+    "output_dir": ROOT / "checkpoints" / "pretrain_from_scratch",
+    "vocab_size": 3000, 
+    "context_length": 128,
     "stride": None,
-    "emb_dim": 64,#emb_dim: 64, 128, 192
+    "emb_dim": 128,
     "n_heads": 4,
-    "n_layers": 1,#n_layers: 1, 2, 4  default:2
-    "drop_rate": 0.0,#drop_rate: 0.0, 0.1, 0.2 default:0.1
-    "batch_size": 8, #batch_size: 2, 4, 8, 16 default:8
+    "n_layers": 2,
+    "drop_rate": 0.1,
+    "batch_size": 2,
     "num_workers": 0,
-    "epochs": 50,
-    "lr": 1e-4,#learning_rate: 1e-4, 3e-4, 5e-4 default:3e-4
+    "epochs": 10,  
+    "lr": 3e-4,
     "weight_decay": 0.1,
     "eval_freq": 500,
-    "eval_iter": 20,
+    "eval_iter": 99999,
     "ckpt_freq": 1000,
     "resume": None,
     "device": "auto",
     "start_context": "영화",
-    "max_train_chars": None,
+    "max_train_chars": None, #corpus
     "max_val_chars": None,
 }
 
@@ -63,15 +66,26 @@ def read_text(path: Path, max_chars: int | None) -> str:
 
 def build_tokenizer(args: argparse.Namespace, train_text: str) -> BPETokenizer:
     tokenizer_path = args.tokenizer_path
+    if tokenizer_path is None:
+        tokenizer_path = args.output_dir / f"bpe_vocab_{args.vocab_size}.json"
+    tokenizer_path = tokenizer_path.resolve()
+    args.tokenizer_path = tokenizer_path
+
     tokenizer = BPETokenizer(vocab_size=args.vocab_size)
 
-    if tokenizer_path.exists() and not args.retrain_tokenizer:
+    if args.use_existing_tokenizer and not args.retrain_tokenizer:
+        if not tokenizer_path.exists():
+            raise FileNotFoundError(f"Tokenizer file not found: {tokenizer_path}")
+        args.tokenizer_mode = "loaded-existing"
+        print(f"Tokenizer mode: {args.tokenizer_mode}")
         tokenizer.load(tokenizer_path)
         print(f"Loaded tokenizer: {tokenizer_path}")
         return tokenizer
 
+    args.tokenizer_mode = "train-from-scratch"
     tokenizer_path.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Training tokenizer on {len(train_text):,} characters...")
+    print(f"Tokenizer mode: {args.tokenizer_mode}")
+    print(f"Training tokenizer on {len(train_text):,} characters from {args.train_path}")
     tokenizer.train(train_text)
     tokenizer.save(tokenizer_path)
     print(f"Saved tokenizer: {tokenizer_path}")
@@ -85,6 +99,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-path", type=Path, default=defaults["val_path"])
     parser.add_argument("--tokenizer-path", type=Path, default=defaults["tokenizer_path"])
     parser.add_argument("--output-dir", type=Path, default=defaults["output_dir"])
+    parser.add_argument("--use-existing-tokenizer", action="store_true")
     parser.add_argument("--retrain-tokenizer", action="store_true")
     parser.add_argument("--vocab-size", type=int, default=defaults["vocab_size"])
     parser.add_argument("--context-length", type=int, default=defaults["context_length"])
@@ -133,6 +148,58 @@ def print_summary(args: argparse.Namespace, train_losses: list[float], val_losse
     print(f"Best val perplexity: {math.exp(best_val):.2f}")
 
 
+def save_run_config(
+    args: argparse.Namespace,
+    train_text: str,
+    val_text: str,
+    train_ids: list[int],
+    val_ids: list[int],
+    train_batches: int,
+    val_batches: int,
+    model_config: dict,
+    num_params: int,
+    device: torch.device,
+) -> None:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    run_config_path = args.output_dir / "run_config.json"
+    payload = {
+        "train_path": str(args.train_path),
+        "val_path": str(args.val_path),
+        "tokenizer_path": str(args.tokenizer_path),
+        "tokenizer_mode": getattr(args, "tokenizer_mode", "unknown"),
+        "train_chars": len(train_text),
+        "val_chars": len(val_text),
+        "train_tokens": len(train_ids),
+        "val_tokens": len(val_ids),
+        "train_batches": train_batches,
+        "val_batches": val_batches,
+        "model_config": model_config,
+        "num_params": num_params,
+        "device": str(device),
+        "hyperparameters": {
+            "vocab_size": args.vocab_size,
+            "context_length": args.context_length,
+            "stride": args.stride,
+            "emb_dim": args.emb_dim,
+            "n_heads": args.n_heads,
+            "n_layers": args.n_layers,
+            "drop_rate": args.drop_rate,
+            "batch_size": args.batch_size,
+            "epochs": args.epochs,
+            "lr": args.lr,
+            "weight_decay": args.weight_decay,
+            "eval_freq": args.eval_freq,
+            "eval_iter": args.eval_iter,
+            "ckpt_freq": args.ckpt_freq,
+        },
+    }
+    run_config_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"Saved run config: {run_config_path}")
+
+
 def main() -> None:
     args = parse_args()
     if args.smoke:
@@ -151,6 +218,8 @@ def main() -> None:
 
     train_text = read_text(args.train_path, args.max_train_chars)
     val_text = read_text(args.val_path, args.max_val_chars)
+    print(f"Train path: {args.train_path}")
+    print(f"Val path: {args.val_path}")
     tokenizer = build_tokenizer(args, train_text)
 
     train_ids = tokenizer.encode(train_text)
@@ -205,6 +274,18 @@ def main() -> None:
     print(f"Tokenizer vocab: {config['vocab_size']}")
     print(f"Model params: {num_params:,}")
     print(f"Batches: train={len(train_loader):,}, val={len(val_loader):,}")
+    save_run_config(
+        args=args,
+        train_text=train_text,
+        val_text=val_text,
+        train_ids=train_ids,
+        val_ids=val_ids,
+        train_batches=len(train_loader),
+        val_batches=len(val_loader),
+        model_config=config,
+        num_params=num_params,
+        device=device,
+    )
 
     train_losses, val_losses = train_model(
         model=model,
