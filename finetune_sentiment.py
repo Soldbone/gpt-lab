@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
 from pathlib import Path
 
 import torch
@@ -19,6 +18,7 @@ from src.finetune import (
     train_epoch_sentiment,
 )
 from src.model import GPTModel
+from src.reproducibility import DEFAULT_SEED, make_torch_generator, seed_worker, set_global_seed
 from pretrain import DEFAULT_HYPERPARAMS, pick_device
 
 ROOT = Path(__file__).resolve().parent
@@ -144,7 +144,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--context-length", type=int, default=DEFAULT_HYPERPARAMS["context_length"])
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--seed", type=int, default=123)
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--freeze-backbone", action="store_true")
     parser.add_argument("--allow-random-init", action="store_true")
     parser.add_argument("--max-train-samples", type=int, default=None)
@@ -162,8 +162,7 @@ def serializable_args(args: argparse.Namespace) -> dict:
 
 def main() -> None:
     args = parse_args()
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    set_global_seed(args.seed)
 
     device = pick_device(args.device)
     tokenizer = BPETokenizer(vocab_size=DEFAULT_HYPERPARAMS["vocab_size"])
@@ -176,6 +175,7 @@ def main() -> None:
     train_dataset = ReviewSentimentDataset(train_data, tokenizer, max_length=args.max_length)
     val_dataset = ReviewSentimentDataset(val_data, tokenizer, max_length=args.max_length)
     test_dataset = ReviewSentimentDataset(test_data, tokenizer, max_length=args.max_length)
+    train_generator = make_torch_generator(args.seed)
 
     train_loader = DataLoader(
         train_dataset,
@@ -183,18 +183,22 @@ def main() -> None:
         shuffle=True,
         drop_last=True,
         num_workers=args.num_workers,
+        generator=train_generator,
+        worker_init_fn=seed_worker,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
+        worker_init_fn=seed_worker,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
+        worker_init_fn=seed_worker,
     )
 
     if args.pretrained_checkpoint.exists():

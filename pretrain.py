@@ -17,6 +17,7 @@ import torch
 from src.bpe import BPETokenizer
 from src.dataset import create_dataloader
 from src.model import GPTModel
+from src.reproducibility import DEFAULT_SEED, make_torch_generator, seed_worker, set_global_seed
 from src.train import calc_loss_loader, generate, load_checkpoint, save_checkpoint, train_model
 
 ROOT = Path(__file__).resolve().parent
@@ -55,6 +56,7 @@ DEFAULT_HYPERPARAMS = {
     "report_eval_iter": None,
     "top_k": "1,5,10",
     "report_sample_tokens": 40,
+    "seed": DEFAULT_SEED,
 }
 
 
@@ -150,6 +152,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--report-eval-iter", type=int, default=defaults["report_eval_iter"])
     parser.add_argument("--top-k", type=str, default=defaults["top_k"])
     parser.add_argument("--report-sample-tokens", type=int, default=defaults["report_sample_tokens"])
+    parser.add_argument("--seed", type=int, default=defaults["seed"])
     parser.add_argument("--smoke", action="store_true")
     return parser.parse_args()
 
@@ -228,6 +231,7 @@ def save_run_config(
             "eval_iter": args.eval_iter,
             "report_eval_iter": args.report_eval_iter,
             "ckpt_freq": args.ckpt_freq,
+            "seed": args.seed,
         },
     }
     run_config_path.write_text(
@@ -790,6 +794,7 @@ def write_training_results(
         {"item": "lr", "value": args.lr},
         {"item": "eval_freq", "value": args.eval_freq},
         {"item": "eval_iter", "value": args.eval_iter},
+        {"item": "seed", "value": args.seed},
         {"item": "final_step", "value": final["step"]},
         {"item": "final_train_loss", "value": f"{final['train_loss']:.6f}"},
         {"item": "final_val_loss", "value": f"{final['val_loss']:.6f}"},
@@ -816,6 +821,7 @@ def write_training_results(
 
 def main() -> None:
     args = parse_args()
+    set_global_seed(args.seed)
     if args.smoke:
         args.vocab_size = min(args.vocab_size, 300)
         args.tokenizer_path = args.output_dir / f"bpe_vocab_{args.vocab_size}_smoke.json"
@@ -831,6 +837,7 @@ def main() -> None:
         args.eval_iter = min(args.eval_iter, 1)
         args.ckpt_freq = 0
 
+    train_generator = make_torch_generator(args.seed)
     train_text = read_text(args.train_path, args.max_train_chars)
     val_text = read_text(args.val_path, args.max_val_chars)
     if args.test_path.exists():
@@ -861,6 +868,8 @@ def main() -> None:
         drop_last=True,
         shuffle=True,
         num_workers=args.num_workers,
+        generator=train_generator,
+        worker_init_fn=seed_worker,
     )
     val_loader = create_dataloader(
         val_ids,
@@ -870,6 +879,7 @@ def main() -> None:
         drop_last=False,
         shuffle=False,
         num_workers=args.num_workers,
+        worker_init_fn=seed_worker,
     )
     test_loader = create_dataloader(
         test_ids,
@@ -879,6 +889,7 @@ def main() -> None:
         drop_last=False,
         shuffle=False,
         num_workers=args.num_workers,
+        worker_init_fn=seed_worker,
     )
 
     config = {
