@@ -26,7 +26,7 @@ DEFAULT_HYPERPARAMS = {
     "train_path": ROOT / "data" / "nsmc_lm_train.txt",
     "val_path": ROOT / "data" / "nsmc_lm_val.txt",
     "test_path": ROOT / "data" / "nsmc_sentiment_test.jsonl",
-    "tokenizer_path": None,
+    "tokenizer_path": ROOT / "checkpoints" / "bpe_vocab_3000.json",
     "output_dir": ROOT / "checkpoints" / "pretrain_from_scratch",
     "results_dir": ROOT / "results",
     "vocab_size": 3000, 
@@ -94,7 +94,7 @@ def build_tokenizer(args: argparse.Namespace, train_text: str) -> BPETokenizer:
 
     tokenizer = BPETokenizer(vocab_size=args.vocab_size)
 
-    if args.use_existing_tokenizer and not args.retrain_tokenizer:
+    if (args.use_existing_tokenizer or tokenizer_path.exists()) and not args.retrain_tokenizer:
         if not tokenizer_path.exists():
             raise FileNotFoundError(f"Tokenizer file not found: {tokenizer_path}")
         args.tokenizer_mode = "loaded-existing"
