@@ -48,7 +48,7 @@ print(df["Label"].value_counts())
 def create_balanced_dataset(df): 
     num_spam = df[df["Label"] == "spam"].shape[0]
     ham_subset = df[df["Label"] == "ham"].sample(
-        num_spam, random_state=123
+        num_spam, random_state=42
     )
     balanced_df = pd.concat([
         ham_subset, df[df["Label"] == "spam"]
@@ -64,7 +64,7 @@ balanced_df["Label"] = balanced_df["Label"].map({"ham": 0, "spam": 1})
 def random_split(df, train_frac, validation_frac):
 
     df = df.sample(
-        frac=1, random_state=123
+        frac=1, random_state=42
     ).reset_index(drop=True)
     train_end = int(len(df) * train_frac)
     validation_end = train_end + int(len(df) * validation_frac)
@@ -156,7 +156,7 @@ test_dataset = SpamDataset(
 #데이터가 알맞은 크기로 들어갔는지
 num_workers = 0
 batch_size = 8
-torch.manual_seed(123)
+torch.manual_seed(42)
 
 train_loader = DataLoader(
     dataset=train_dataset,
