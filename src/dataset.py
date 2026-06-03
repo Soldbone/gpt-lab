@@ -41,8 +41,8 @@ class GPTDataset(Dataset):
 
     def __len__(self) -> int:
         """TODO: 전체 샘플 개수를 반환합니다."""
-        return len(self.input_ids)
-        raise NotImplementedError("GPTDataset.__len__을 구현하세요.")
+        return self._length
+        # raise NotImplementedError("GPTDataset.__len__을 구현하세요.")
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -53,7 +53,7 @@ class GPTDataset(Dataset):
             target_ids: (context_length,)
         """
         return self.input_ids[idx], self.target_ids[idx]
-        raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
+        # raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
 
 
 def create_dataloader(
@@ -72,8 +72,8 @@ def create_dataloader(
         batch_size=batch_size,
         shuffle=shuffle,
         drop_last=drop_last,
-        num_workers=num_workers
+        num_workers=num_workers,
     )
 
     return dataloader
-    raise NotImplementedError("create_dataloader를 구현하세요.")
+    # raise NotImplementedError("create_dataloader를 구현하세요.")

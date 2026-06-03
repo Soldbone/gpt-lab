@@ -80,7 +80,7 @@ class BPETokenizer:
         """문장 끝 토큰 ID."""
         return SPECIAL_IDS[EOS_TOKEN]
 
-    def train(self, corpus: str):
+    def train(self, corpus: str, progress_interval: int | None = None):
         """
         TODO: 코퍼스에서 BPE merge rule과 vocabulary를 학습합니다.
 
@@ -101,6 +101,8 @@ class BPETokenizer:
 
         #사전에 추가로 등록을 계속 할건데,
         #현재 사전에 등록된 토큰의 갯수가 사전 크기를 넘지 않을때까지
+        target_merges = max(0, self.vocab_size - len(self.token_to_id))
+
         while len(self.token_to_id) < self.vocab_size: 
             count_dict = Counter()
             temp_list = [] 
@@ -130,6 +132,13 @@ class BPETokenizer:
             #voca 확장. 제일 많이나온 바이트에 현재 dict_size삽입
             self.token_to_id[voca_most_byte] = dict_size 
             self.id_to_token[dict_size] = voca_most_byte 
+
+            if progress_interval and len(self.merges) % progress_interval == 0:
+                print(
+                    f"BPE merge {len(self.merges):,}/{target_merges:,} "
+                    f"(vocab {len(self.token_to_id):,}/{self.vocab_size:,})",
+                    flush=True,
+                )
 
             j = 0
             #병합? 가장 많이나온 쌍을 합쳐서 저장?
@@ -256,7 +265,12 @@ class BPETokenizer:
 
         return id_list
     
-    def decode(self, ids: list[int], skip_special: bool = True) -> str:
+    def decode(
+        self,
+        ids: list[int],
+        skip_special: bool = True,
+        errors: str = "strict",
+    ) -> str:
         """
         TODO: token ID 리스트를 문자열로 복원합니다.
 
@@ -272,4 +286,4 @@ class BPETokenizer:
             elif not skip_special:
                 b_bytes += self.id_to_token[ids[i]].encode("utf-8")
         
-        return b_bytes.decode("utf-8")
+        return b_bytes.decode("utf-8", errors=errors)
