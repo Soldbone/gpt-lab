@@ -8,6 +8,7 @@ import csv
 import json
 import math
 import os
+import random
 import textwrap
 from pathlib import Path
 from datetime import datetime
@@ -48,6 +49,7 @@ DEFAULT_HYPERPARAMS = {
     "ckpt_freq": 1000,
     "resume": None,
     "device": "auto",
+    "seed": 42,
     "start_context": "영화",
     "max_train_chars": None,
     "max_val_chars": None,
@@ -509,6 +511,24 @@ def pick_device(name: str) -> torch.device:
     return torch.device("cpu")
 
 
+def set_seed(seed: int) -> None:
+    """Set common random seeds for reproducible training runs."""
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+def seed_worker(worker_id: int) -> None:
+    """Seed DataLoader workers from PyTorch's per-worker initial seed."""
+    worker_seed = torch.initial_seed() % 2**32
+    random.seed(worker_seed)
+    torch.manual_seed(worker_seed)
+
+
 def read_text(path: Path, max_chars: int | None) -> str:
     if path.suffix == ".jsonl":
         texts = []
@@ -584,6 +604,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ckpt-freq", type=int, default=defaults["ckpt_freq"])
     parser.add_argument("--resume", type=Path, default=defaults["resume"])
     parser.add_argument("--device", type=str, default=defaults["device"])
+    parser.add_argument("--seed", type=int, default=defaults["seed"])
     parser.add_argument("--start-context", type=str, default=defaults["start_context"])
     parser.add_argument("--max-train-chars", type=int, default=defaults["max_train_chars"])
     parser.add_argument("--max-val-chars", type=int, default=defaults["max_val_chars"])
@@ -601,7 +622,8 @@ def print_summary(args: argparse.Namespace, train_losses: list[float], val_losse
         "Hyperparameters: "
         f"vocab={args.vocab_size}, context={args.context_length}, "
         f"emb={args.emb_dim}, layers={args.n_layers}, heads={args.n_heads}, "
-        f"drop={args.drop_rate}, batch={args.batch_size}, epochs={args.epochs}, lr={args.lr}"
+        f"drop={args.drop_rate}, batch={args.batch_size}, epochs={args.epochs}, "
+        f"lr={args.lr}, seed={args.seed}"
     )
     if not train_losses or not val_losses:
         print("No evaluation losses were recorded. Lower --eval-freq or train longer.")
@@ -664,6 +686,7 @@ def save_run_config(
             "batch_size": args.batch_size,
             "epochs": args.epochs,
             "lr": args.lr,
+            "seed": args.seed,
             "weight_decay": args.weight_decay,
             "eval_freq": args.eval_freq,
             "eval_iter": args.eval_iter,
@@ -950,6 +973,7 @@ def write_training_results(
         {"item": "batch_size",        "value": args.batch_size},
         {"item": "epochs",            "value": args.epochs},
         {"item": "lr",                "value": args.lr},
+        {"item": "seed",              "value": args.seed},
         {"item": "eval_freq",         "value": args.eval_freq},
         {"item": "eval_iter",         "value": args.eval_iter},
         {"item": "final_step",        "value": final["step"]},
@@ -983,6 +1007,8 @@ def write_training_results(
 
 def main() -> None:
     args = parse_args()
+    set_seed(args.seed)
+
     if args.smoke:
         args.vocab_size      = min(args.vocab_size, 300)
         args.tokenizer_path  = args.output_dir / f"bpe_vocab_{args.vocab_size}_smoke.json"
@@ -1021,9 +1047,14 @@ def main() -> None:
     ):
         raise ValueError("Not enough tokens for the chosen context length.")
 
+    train_generator = torch.Generator()
+    train_generator.manual_seed(args.seed)
+    worker_init_fn = seed_worker if args.num_workers > 0 else None
     loader_kwargs = dict(context_length=args.context_length, batch_size=args.batch_size,
-                         stride=args.stride, num_workers=args.num_workers)
-    train_loader = create_dataloader(train_ids, drop_last=True,  shuffle=True,  **loader_kwargs)
+                         stride=args.stride, num_workers=args.num_workers,
+                         worker_init_fn=worker_init_fn)
+    train_loader = create_dataloader(train_ids, drop_last=True,  shuffle=True,
+                                     generator=train_generator, **loader_kwargs)
     val_loader   = create_dataloader(val_ids,   drop_last=False, shuffle=False, **loader_kwargs)
     test_loader  = create_dataloader(test_ids,  drop_last=False, shuffle=False, **loader_kwargs)
 
@@ -1048,6 +1079,7 @@ def main() -> None:
 
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Device:        {device}")
+    print(f"Seed:          {args.seed}")
     print(f"Tokenizer vocab: {config['vocab_size']}")
     print(f"Model params:  {num_params:,}")
     print(f"Batches: train={len(train_loader):,}, val={len(val_loader):,}, test={len(test_loader):,}")

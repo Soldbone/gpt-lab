@@ -144,7 +144,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--context-length", type=int, default=DEFAULT_HYPERPARAMS["context_length"])
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--seed", type=int, default=123)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--freeze-backbone", action="store_true")
     parser.add_argument("--allow-random-init", action="store_true")
     parser.add_argument("--max-train-samples", type=int, default=None)

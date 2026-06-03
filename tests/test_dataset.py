@@ -84,6 +84,38 @@ class TestCreateDataloader:
         assert inp.shape == (batch_size, context_length)
         assert tgt.shape == (batch_size, context_length)
 
+    def test_dataloader_shuffle_is_reproducible_with_generator(self):
+        """같은 seed의 generator를 넘기면 shuffle된 첫 배치 순서가 같아야 한다."""
+        from dataset import create_dataloader
+
+        token_ids = list(range(200))
+        context_length = 8
+        batch_size = 4
+        seed = 42
+
+        generator_a = torch.Generator().manual_seed(seed)
+        generator_b = torch.Generator().manual_seed(seed)
+        loader_a = create_dataloader(
+            token_ids,
+            context_length,
+            batch_size=batch_size,
+            shuffle=True,
+            generator=generator_a,
+        )
+        loader_b = create_dataloader(
+            token_ids,
+            context_length,
+            batch_size=batch_size,
+            shuffle=True,
+            generator=generator_b,
+        )
+
+        inp_a, tgt_a = next(iter(loader_a))
+        inp_b, tgt_b = next(iter(loader_b))
+
+        torch.testing.assert_close(inp_a, inp_b)
+        torch.testing.assert_close(tgt_a, tgt_b)
+
 
 # =============================================================================
 # InputEmbedding
