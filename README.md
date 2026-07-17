@@ -1,235 +1,72 @@
-# 과제 - mini GPT 구현
+# Mini GPT Lab
 
-## 1. 개요
+> tokenizer부터 사전학습과 감성 분류까지 작은 GPT의 흐름을 직접 연결한 학습 프로젝트
 
-이 프로젝트는 PyTorch만 사용해 작은 GPT 계열 언어 모델을 직접 구현하는 학생용 템플릿입니다. 완성할 모델은 거대한 ChatGPT가 아니라, LLM의 핵심 component를 이해하기 위한 교육용 mini GPT입니다.
+완성된 모델을 호출하는 대신 언어 모델 안에서 데이터가 어떻게 토큰과 벡터를 거쳐 다음 토큰 예측으로 이어지는지 구현했습니다. PyTorch의 tensor와 기본 module은 사용하지만 Hugging Face `transformers`, `tokenizers`, 외부 pretrained model은 사용하지 않습니다.
 
-학생용 소스는 `TODO`와 `NotImplementedError`가 남아 있는 상태입니다. 처음 테스트를 실행하면 실패하는 것이 정상이며, 각 단계의 TODO를 구현하면서 해당 테스트 파일을 하나씩 통과시키면 됩니다.
-
-참고 도서:
-
-- 『밑바닥부터 만들면서 배우는 LLM』
-- 교재 소스 코드: `https://github.com/rickiepark/llm-from-scratch`
-
----
-
-## 2. 코드 관리
-
-- 팀별 GitHub 저장소를 준비합니다.
-- 개인 작업은 각자 branch를 만들어 진행합니다.
-- `main` 또는 `master`에는 직접 push하지 않습니다.
-- Pull Request로 팀원이 리뷰한 뒤 병합합니다.
-- 병합 전에는 관련 테스트와 전체 테스트를 통과시킵니다.
-- 데이터 파일, checkpoint, token, 비밀번호는 commit하지 않습니다.
-
----
-
-## 3. 개발 환경
-
-### 3.1 요구 사항
-
-- Python 3.11
-- 허용 라이브러리:
-  - `torch`
-  - `torch.nn`
-  - `torch.utils.data`
-  - `numpy`
-  - `matplotlib`
-  - `pytest`
-- 금지:
-  - Hugging Face `transformers`, `datasets`, `tokenizers`
-  - `sentencepiece`
-  - `spacy`
-  - `nltk`
-  - `lightning`
-  - `accelerate`
-  - 외부 pretrained model
-  - 외부 tokenizer vocabulary
-
-교재에서는 `tiktoken`을 사용하는 부분이 있지만, 이 과제에서는 tokenizer를 직접 구현해야 하므로 `tiktoken`도 사용하지 않습니다.
-
-### 3.2 Colab에서 사용
-
-1. 메뉴 **런타임 → 런타임 유형 변경**에서 **Python 3**, **GPU**를 선택합니다.
-2. 브라우저에서 다음 주소를 엽니다. `USERNAME`, 저장소명, 브랜치명은 본인 환경에 맞게 바꿉니다. 브랜치가 `main`이면 URL에서 `master`를 `main`으로 바꿉니다.
+## 구현 흐름
 
 ```text
-https://colab.research.google.com/github/USERNAME/gpt-lab/blob/master/gpt-lab.ipynb
+UTF-8 text
+→ byte-level BPE
+→ token·position embedding
+→ causal multi-head attention
+→ Transformer blocks
+→ next-token pretraining
+→ NSMC sentiment fine-tuning
 ```
 
-3. 노트북의 **1. 환경설정** 코드 셀을 가장 먼저 실행합니다.
-4. Colab 입력창에 GitHub 저장소 URL을 입력합니다.
+| 단계 | 구현 내용 | 코드 |
+| --- | --- | --- |
+| Tokenizer | UTF-8 byte-level BPE 학습, encode, decode, 저장 | [`bpe.py`](./src/bpe.py) |
+| Dataset | context window와 next-token target 구성 | [`dataset.py`](./src/dataset.py) |
+| Embedding | token embedding과 position embedding | [`embeddings.py`](./src/embeddings.py) |
+| Attention | causal mask를 적용한 multi-head self-attention | [`attention.py`](./src/attention.py) |
+| GPT | LayerNorm, GELU, FFN, residual block, generation | [`model.py`](./src/model.py) |
+| Training | loss, checkpoint, sampling, pretraining loop | [`train.py`](./src/train.py) |
+| Fine-tuning | NSMC dataset과 sentiment classifier | [`finetune.py`](./src/finetune.py) |
 
-```text
-github.com/USERNAME/gpt-lab.git
-```
+## 구현하며 확인한 기준
 
-5. Private 저장소라면 GitHub Personal Access Token을 입력합니다. 공개 저장소라면 Enter를 누르면 됩니다.
-6. 그 다음 셀부터 데이터 로드 → BPE/모델 → 학습·평가 → 미세 조정 순서로 진행합니다.
+- tokenizer도 외부 vocabulary를 가져오지 않고 학습 데이터에서 직접 만듭니다.
+- causal mask로 현재 토큰이 미래 토큰을 보지 못하게 합니다.
+- 각 모듈의 입력과 출력 shape를 단위 테스트로 먼저 확인합니다.
+- pretraining과 classification을 분리해 같은 backbone이 다른 목적에 쓰이는 과정을 비교합니다.
+- 큰 학습을 돌리기 전에 작은 설정으로 loss와 generation 경로가 동작하는지 검증합니다.
 
-### 3.3 로컬에서 실행
+## 데이터
 
-```bash
-cd gpt-lab
-conda create -n gpt-lab python=3.11 -y
-conda activate gpt-lab
-pip install -r requirements.txt
-pytest tests/ -v
-```
-
----
-
-## 4. 프로젝트 소스
-
-```text
-gpt-lab/
-├── README.md
-├── REPORT.md
-├── requirements.txt
-├── download_data.py
-├── gpt-lab.ipynb
-├── data/
-├── src/
-│   ├── __init__.py
-│   ├── bpe.py
-│   ├── dataset.py
-│   ├── embeddings.py
-│   ├── attention.py
-│   ├── model.py
-│   ├── train.py
-│   └── finetune.py
-└── tests/
-    ├── test_bpe.py
-    ├── test_dataset.py
-    ├── test_attention.py
-    ├── test_model.py
-    ├── test_train.py
-    └── test_finetune.py
-```
-
-| 파일 | 역할 |
-| --- | --- |
-| `download_data.py` | NSMC 원본 데이터를 내려받고 과제용 파일 생성 |
-| `gpt-lab.ipynb` | Colab/로컬 실행 순서 안내 노트북 |
-| `src/bpe.py` | UTF-8 byte-level BPE tokenizer |
-| `src/dataset.py` | GPT 사전 학습용 Dataset과 DataLoader |
-| `src/embeddings.py` | token embedding + position embedding |
-| `src/attention.py` | causal multi-head self-attention |
-| `src/model.py` | LayerNorm, GELU, FeedForward, TransformerBlock, GPTModel |
-| `src/train.py` | loss 계산, checkpoint, generation, pretraining loop |
-| `src/finetune.py` | NSMC 감성 분류 Dataset과 classifier |
-
----
-
-## 5. 데이터
-
-기본 데이터는 **NAVER Sentiment Movie Corpus(NSMC)** 입니다.
-
-- 원본 저장소: `https://github.com/e9t/nsmc`
-- 라이선스: CC0 1.0
-- 원본 파일:
-  - `ratings_train.txt`
-  - `ratings_test.txt`
-- 컬럼:
-  - `id`
-  - `document`: 영화 리뷰 문장
-  - `label`: 부정 `0`, 긍정 `1`
-
-데이터 준비:
+[NAVER Sentiment Movie Corpus](https://github.com/e9t/nsmc)를 사용합니다. 원문을 language modeling용 text와 감성 분류용 JSONL로 나누어 생성합니다.
 
 ```bash
 python download_data.py
 ```
 
-생성되는 파일:
+생성된 데이터와 checkpoint는 Git에 포함하지 않습니다.
 
-| 파일 | 용도 |
-| --- | --- |
-| `data/nsmc_lm_train.txt` | 사전 학습 train 텍스트 |
-| `data/nsmc_lm_val.txt` | 사전 학습 validation 텍스트 |
-| `data/nsmc_sentiment_train.jsonl` | 감성 분류 train 데이터 |
-| `data/nsmc_sentiment_val.jsonl` | 감성 분류 validation 데이터 |
-| `data/nsmc_sentiment_test.jsonl` | 감성 분류 test 데이터 |
+## 실행
 
-데이터 파일은 `.gitignore`에 포함되어 있으므로 GitHub에 commit하지 않습니다.
+Python 3.11 기준입니다.
 
----
+```bash
+conda create -n gpt-lab python=3.11 -y
+conda activate gpt-lab
+pip install -r requirements.txt
+python download_data.py
+pytest tests -q
+```
 
-## 6. 단계별 구현 안내
+전체 실습 순서는 [`gpt-lab.ipynb`](./gpt-lab.ipynb)에서 실행할 수 있습니다.
 
-### 6.1 구현 전 확인 사항
+## 검증 범위
 
-- 작은 데이터로 먼저 실행해서 코드가 동작하는지 확인합니다.
-- 각 단계의 TODO를 구현한 뒤 해당 테스트 파일만 먼저 실행합니다.
-- 단계별 테스트를 모두 통과한 뒤 마지막에 전체 테스트를 실행합니다.
-- Colab 런타임이 끊길 수 있으므로 오래 걸리는 학습 결과와 checkpoint는 저장합니다.
-- 데이터 파일, checkpoint, token, 비밀번호는 GitHub에 commit하지 않습니다.
+```bash
+pytest tests/test_bpe.py -q
+pytest tests/test_dataset.py -q
+pytest tests/test_attention.py -q
+pytest tests/test_model.py -q
+pytest tests/test_train.py -q
+pytest tests/test_finetune.py -q
+```
 
-### 6.2 노트북 진행 방법
-
-`gpt-lab.ipynb`는 개발 순서와 같은 순서로 구성되어 있습니다.
-
-1. 환경설정 셀 실행
-2. 데이터 준비 셀 실행
-3. `src/bpe.py` TODO 구현
-4. `pytest tests/test_bpe.py -v` 셀 실행
-5. 통과하면 다음 단계로 이동
-6. 마지막에 `pytest tests/ -v` 실행
-
-노트북에서 어떤 셀이 `NotImplementedError`를 출력하면 아직 해당 단계 TODO가 남아 있다는 뜻입니다.
-
-### 6.3 개발 순서 요약
-
-| 순서 | 구현 대상 | 파일 | 테스트 |
-| --- | --- | --- | --- |
-| 1 | BPE tokenizer | `src/bpe.py` | `pytest tests/test_bpe.py -v` |
-| 2 | Dataset / InputEmbedding | `src/dataset.py`, `src/embeddings.py` | `pytest tests/test_dataset.py -v` |
-| 3 | MultiHeadAttention | `src/attention.py` | `pytest tests/test_attention.py -v` |
-| 4 | GPT 모델 구성 요소 | `src/model.py` | `pytest tests/test_model.py -v` |
-| 5 | 사전 학습 유틸리티 | `src/train.py` | `pytest tests/test_train.py -v` |
-| 6 | 감성 분류 미세 조정 | `src/finetune.py` | `pytest tests/test_finetune.py -v` |
-| 7 | 전체 테스트 | 전체 | `pytest tests/ -v` |
-
-처음부터 `pytest tests/ -v`만 실행하면 어디가 문제인지 찾기 어렵습니다. 현재 구현 중인 단계의 테스트부터 실행하세요.
-
----
-
-## 7. 추가 미션
-
-필수 구현을 마친 뒤 선택적으로 진행합니다.
-
-### 7.1 사전 학습 성능 향상
-
-- 학습률 warmup
-- cosine decay
-- gradient clipping
-- weight decay 실험
-
-참고:
-
-- 교재 부록 D
-- 교재 소스의 `appendix-D.ipynb`
-
-### 7.2 하이퍼파라미터 탐색
-
-- `batch_size`: 2, 4, 8, 16
-- `drop_rate`: 0.0, 0.1, 0.2
-- `learning_rate`: 1e-4, 3e-4, 5e-4
-- `context_length`: 64, 128
-- `n_layers`: 1, 2, 4
-- `emb_dim`: 64, 128, 192
-
-### 7.3 더 나은 감성 분류
-
-- backbone 일부 freeze
-- classifier learning rate와 backbone learning rate 분리
-- class imbalance 확인
-- validation loss가 가장 낮은 checkpoint 선택
-
----
-
-## 8. 제출물
-
-- 동작하는 `src/` 소스 코드
-- 실행 가능한 `gpt-lab.ipynb`
-- `REPORT.md`
+테스트는 tokenizer round trip, tensor shape, causal attention, generation, checkpoint, fine-tuning 경로를 다룹니다. 학습 설정과 실험 결과는 [`REPORT.md`](./REPORT.md)에 기록합니다.
