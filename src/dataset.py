@@ -25,8 +25,8 @@ class GPTDataset(Dataset):
         self.token_ids = token_ids
         self.context_length = context_length
         self.stride = stride if stride is not None else context_length
-        # TODO: 만들 수 있는 학습 샘플 개수를 self._length에 저장하세요.
-        
+        # context window와 stride에 따라 학습 샘플을 구성합니다.
+
         self.input_ids = []
         self.target_ids = []
         
@@ -36,16 +36,13 @@ class GPTDataset(Dataset):
             self.input_ids.append(torch.tensor(input_chunk))
             self.target_ids.append(torch.tensor(target_chunk))
         self._length = len(self.input_ids)
-        # raise NotImplementedError("GPTDataset.__init__에서 self._length를 구현하세요.")
-
     def __len__(self) -> int:
-        """TODO: 전체 샘플 개수를 반환합니다."""
+        """전체 학습 샘플 개수를 반환합니다."""
         return self._length
-        # raise NotImplementedError("GPTDataset.__len__을 구현하세요.")
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        TODO: idx번째 input_ids와 target_ids를 LongTensor로 반환합니다.
+        idx번째 input_ids와 target_ids를 LongTensor로 반환합니다.
 
         Returns:
             input_ids: (context_length,)
@@ -54,8 +51,6 @@ class GPTDataset(Dataset):
         # idx번째 input_ids 가져오기 
 
         return self.input_ids[idx], self.target_ids[idx]   
-
-        # raise NotImplementedError("GPTDataset.__getitem__을 구현하세요.")
 
 
 def create_dataloader(
@@ -78,4 +73,3 @@ def create_dataloader(
     )
 
     return dataloader
-    # raise NotImplementedError("create_dataloader를 구현하세요.")

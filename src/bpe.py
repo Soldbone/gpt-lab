@@ -41,7 +41,7 @@ class BPETokenizer:
 
     def _init_special_tokens(self):
         """
-        TODO:
+        초기 vocabulary 구성:
         1. 특수 토큰 4개를 고정 ID 0~3에 등록합니다.
         2. byte 0~255를 ID 4~259에 bytes([byte_value]) 형태로 등록합니다.
         """
@@ -62,8 +62,6 @@ class BPETokenizer:
             self.id_to_token[i] = bytes([i - BYTE_OFFSET])
             self.token_to_id[bytes([i - BYTE_OFFSET])] = i
     
-        # raise NotImplementedError("_init_special_tokens를 구현하세요.")
-
     def get_pad_id(self):
         """padding 토큰 ID."""    
         return SPECIAL_IDS[PAD_TOKEN]
@@ -82,7 +80,7 @@ class BPETokenizer:
 
     def train(self, corpus: str):
         """
-        TODO: 코퍼스에서 BPE merge rule과 vocabulary를 학습합니다.
+        코퍼스에서 BPE merge rule과 vocabulary를 학습합니다.
 
         구현 힌트:
         - `corpus.encode("utf-8")`로 byte ID 시퀀스를 만듭니다.
@@ -150,7 +148,7 @@ class BPETokenizer:
 
     def save(self, path: str | Path):
         """
-        TODO: vocabulary와 merge rule을 JSON 파일로 저장합니다.
+        vocabulary와 merge rule을 JSON 파일로 저장합니다.
         bytes와 tuple은 JSON에 바로 저장할 수 없으므로 type 정보를 함께 저장하세요.
         """
         #token to json
@@ -179,7 +177,7 @@ class BPETokenizer:
 
     def load(self, path: str | Path):
         """
-        TODO: save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
+        save()로 저장한 JSON 파일을 읽어 vocabulary와 merge rule을 복원합니다.
         """
         def token_from_json(obj):
             if obj["type"] == "bytes":
@@ -211,7 +209,7 @@ class BPETokenizer:
 
     def encode(self, text: str, add_bos_eos: bool = False) -> list[int]:
         """
-        TODO: 문자열을 token ID 리스트로 변환합니다.
+        문자열을 token ID 리스트로 변환합니다.
 
         구현 힌트:
         - 먼저 UTF-8 byte ID 리스트를 만듭니다.
@@ -241,7 +239,7 @@ class BPETokenizer:
             
             prev = bytes([encoded_list[i]])
 
-            # TODO: count가 정확히 단어 끝까지 점프하도록 설정되는지 확인해봐야함
+            # 검증 메모: count가 병합한 byte 구간의 끝까지 이동하는지는 round-trip 테스트로 확인합니다.
             for j in range(i+1, len(encoded_list) - 1):
                 word = encoded_list[i : j + 1]
                 if word in self.merges: 
@@ -258,7 +256,7 @@ class BPETokenizer:
     
     def decode(self, ids: list[int], skip_special: bool = True) -> str:
         """
-        TODO: token ID 리스트를 문자열로 복원합니다.
+        token ID 리스트를 문자열로 복원합니다.
 
         주의:
         - merge token은 원본 byte token까지 재귀적으로 펼칩니다.

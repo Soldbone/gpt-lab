@@ -26,17 +26,15 @@ class InputEmbedding(nn.Module):
         super().__init__()
         self.emb_dim = emb_dim
         self.context_length = context_length
-        # TODO: token_embedding, position_embedding, dropout을 정의하세요.
+        # Token embedding과 position embedding을 같은 차원으로 구성합니다.
         self.token_embedding_layer = nn.Embedding(vocab_size, emb_dim)        
         self.position_layer= nn.Embedding(context_length, emb_dim) 
         self.position_embeddings = self.position_layer(torch.arange(context_length))
 
         self.dropout = nn.Dropout(p=drop_rate)
-        # raise NotImplementedError("InputEmbedding.__init__을 구현하세요.")
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        TODO: token embedding과 position embedding을 더한 뒤 dropout을 적용합니다.
+        token embedding과 position embedding을 더한 뒤 dropout을 적용합니다.
 
         Args:
             x: (batch_size, seq_len) token IDs
@@ -52,4 +50,3 @@ class InputEmbedding(nn.Module):
 
         res = token_embeddings + position_embeddings
         return self.dropout(res)
-        # raise NotImplementedError("InputEmbedding.forward를 구현하세요.")

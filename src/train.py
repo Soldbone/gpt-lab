@@ -16,7 +16,7 @@ def calc_loss_batch(
     model: GPTModel,
     device: torch.device,
 ) -> torch.Tensor:
-    """TODO: 한 배치를 device로 옮긴 뒤 다음 토큰 예측 cross entropy loss를 계산합니다."""
+    """한 배치를 device로 옮긴 뒤 다음 토큰 예측 cross entropy loss를 계산합니다."""
     input = input_batch.to(device)
     target = target_batch.to(device)
     logits = model(input)
@@ -24,7 +24,6 @@ def calc_loss_batch(
         logits.flatten(0, 1), target.flatten()
     )
     return loss
-    #raise NotImplementedError("calc_loss_batch를 구현하세요.")
 
 
 def calc_loss_loader(
@@ -33,7 +32,7 @@ def calc_loss_loader(
     device: torch.device,
     num_batches: int | None = None,
 ) -> float:
-    """TODO: data_loader의 평균 loss를 계산합니다. 검증에서는 torch.no_grad()를 사용하세요."""
+    """data_loader에서 선택한 batch들의 평균 loss를 계산합니다."""
     total_loss = 0
     if len(data_loader) == 0:
         return float("nan")
@@ -50,7 +49,6 @@ def calc_loss_loader(
         else:
             break
     return total_loss / num_batches
-    #raise NotImplementedError("calc_loss_loader를 구현하세요.")
 
 
 def save_checkpoint(
@@ -60,7 +58,7 @@ def save_checkpoint(
     global_step: int,
     path: str,
 ) -> None:
-    """TODO: model/optimizer 상태, epoch, global_step을 torch.save로 저장합니다."""
+    """model/optimizer 상태, epoch, global_step을 torch.save로 저장합니다."""
     torch.save({
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
@@ -70,8 +68,6 @@ def save_checkpoint(
         path
     )
 
-    #raise NotImplementedError("save_checkpoint를 구현하세요.")
-
 
 def load_checkpoint(
     model: GPTModel,
@@ -79,14 +75,13 @@ def load_checkpoint(
     path: str,
     device: torch.device,
 ) -> tuple[int, int]:
-    """TODO: torch.load로 checkpoint를 읽어 model/optimizer 상태를 복원합니다."""
+    """checkpoint에서 model/optimizer 상태를 복원하고 epoch와 step을 반환합니다."""
     checkpoint = torch.load(path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     model.train()
     return checkpoint["epoch"], checkpoint["global_step"]
-    #raise NotImplementedError("load_checkpoint를 구현하세요.")
 
 
 def generate(
@@ -98,7 +93,7 @@ def generate(
     top_k: int | None = None,
     eos_id: int | None = None,
 ) -> torch.Tensor:
-    """TODO: temperature와 top-k 샘플링을 지원하는 생성 함수를 구현합니다."""
+    """temperature와 top-k 샘플링으로 다음 token을 생성합니다."""
     for _ in range(max_new_tokens):
         idx_cond = idx[:, -context_size:]
         with torch.no_grad():
@@ -122,7 +117,6 @@ def generate(
             break
         idx = torch.cat((idx, idx_next), dim=1)
     return idx
-    #raise NotImplementedError("generate를 구현하세요.")
 
 def text_to_token_ids(text, tokenizer):
     encoded = tokenizer.encode(text)
@@ -143,7 +137,7 @@ def generate_and_print_sample(
     temperature: float = 0.8,
     top_k: int | None = 40,
 ) -> None:
-    """TODO: start_context를 encode하고 generate 후 decode하여 출력합니다."""
+    """start_context를 encode하고 생성 결과를 decode하여 출력합니다."""
     model.eval()
     encoded = text_to_token_ids(start_context, tokenizer).to(device)
     with torch.no_grad():
@@ -157,7 +151,6 @@ def generate_and_print_sample(
     decoded_text = token_ids_to_text(token_ids, tokenizer)
     print(decoded_text.replace("\n", " "))
     model.train()
-    #raise NotImplementedError("generate_and_print_sample을 구현하세요.")
 
 def evaluate_model(model, train_loader, val_loader, device, eval_iter):
     model.eval()
@@ -186,7 +179,7 @@ def train_model(
     start_epoch: int = 0,
     global_step: int = 0,
 ) -> list[float]:
-    """TODO: 사전 학습 루프를 구현하고 epoch별 train loss 리스트를 반환합니다."""
+    """사전 학습 루프를 실행하고 평가 시점의 train/validation loss를 반환합니다."""
     train_losses, val_losses= [], []
     tokens_seen = 0
 
@@ -217,7 +210,6 @@ def train_model(
             save_checkpoint(model, optimizer, epoch, global_step, path)
         generate_and_print_sample(model, tokenizer, device, start_context)
     return train_losses, val_losses
-    #raise NotImplementedError("train_model을 구현하세요.")
 
 
 def plot_losses(train_losses: list[float], val_losses: list[float] | None = None) -> None:
