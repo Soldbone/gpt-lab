@@ -1,156 +1,162 @@
-# mini GPT 구현 과제 보고서
+# GPT Lab 구현·검증 보고서
 
-## 0. 반·팀원
+기준일: 2026-07-18
+
+## 0. 팀과 기록 범위
 
 | 항목 | 내용 |
 | --- | --- |
-| 반 | (예: AI 1반) |
-| 팀명 | (예: 3팀) |
-| 팀원 | (예: 홍길동, 김철수) |
+| 과정/반 | 저장소에 별도 기록이 남아 있지 않음 |
+| 팀명 | 저장소에 별도 팀명이 남아 있지 않은 4인 학습 팀 |
+| 팀원 | 이현성, 이지섭, 양은열, 이시원 |
+| 목표 | tokenizer부터 GPT pretraining과 sentiment fine-tuning 경계까지 직접 구현 |
+| 증거 기준 | 현재 source/tests, Git history, commit `4fe533e`의 historical artifacts |
 
----
+## 1. 구현 현황과 기여
 
-## 1. 구현 현황
-
-| 단계 | 구현 내용 | 구현 파일 | 담당자 |
+| 단계 | 구현 내용 | 파일 | 주 기여 근거 |
 | --- | --- | --- | --- |
-| 1 | UTF-8 byte-level BPE tokenizer | `src/bpe.py` |  |
-| 2 | GPTDataset, create_dataloader, InputEmbedding | `src/dataset.py`, `src/embeddings.py` |  |
-| 3 | MultiHeadAttention, causal mask | `src/attention.py` |  |
-| 4 | LayerNorm, GELU, FeedForward, TransformerBlock, GPTModel, generate_text_simple | `src/model.py` |  |
-| 5 | loss 계산, checkpoint, generate, train_model | `src/train.py` |  |
-| 6 | NSMC 감성 분류 Dataset과 classifier | `src/finetune.py` |  |
+| 1 | UTF-8 byte-level BPE tokenizer | `src/bpe.py` | 이현성·양은열 commit history |
+| 2 | GPTDataset, DataLoader, InputEmbedding | `src/dataset.py`, `src/embeddings.py` | 이현성·이지섭 commit history |
+| 3 | MultiHeadAttention, causal mask | `src/attention.py` | 이지섭 commit history |
+| 4 | LayerNorm, GELU, FFN, TransformerBlock, GPTModel | `src/model.py` | 이현성 commit history |
+| 5 | loss, checkpoint, generation, training loop | `src/train.py` | 이시원 commits `853bdab`, `e646620`, `5ebd6f0`, `1d1eeb5`, `a7f6735`, `bf6fcff`, `8eb0f58`, `451669b` |
+| 6 | NSMC sentiment dataset와 classifier utilities | `src/finetune.py` | 이시원 commit `f8c3ef6` |
+| 7 | 재현 테스트와 batch-size artifact | tests, `outputs/` history | 이시원 commits `cb69bdf`, `4fe533e` |
 
----
+표는 Git에 직접 남은 대표 author/commit을 보여줍니다. 팀 리뷰와 공동 디버깅까지 개인 단독 구현으로 확대 해석하지 않습니다.
 
-## 2. 테스트 통과 현황
+## 2. 현재 테스트 검증
 
-| 실행 명령 | 결과 | 비고 |
-| --- | --- | --- |
-| `pytest tests/test_bpe.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/test_dataset.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/test_attention.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/test_model.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/test_train.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/test_finetune.py -v` | 통과 / 실패 / 미실행 |  |
-| `pytest tests/ -v` | 통과 / 실패 / 미실행 |  |
+실행 명령:
 
-실패한 테스트가 있다면 에러 요약을 적습니다.
+```powershell
+work\.venv\Scripts\python.exe -m pytest work/gpt-lab-source/tests -q
+```
 
-| 실패한 테스트 | 에러 요약 | 해결 시도 |
-| --- | --- | --- |
-| (예: `test_train.py::TestGenerate::test_generate_shape`) |  |  |
+| 결과 | 내용 |
+| --- | --- |
+| 수집/통과 | 33 passed |
+| 실패 | 0 |
+| 경고 | headless Matplotlib 환경의 `FigureCanvasAgg` non-interactive warning 2건 |
+| 포함 범위 | BPE, dataset, attention, model, training, fine-tuning, repository completion contract |
 
----
+장시간 pretraining과 NSMC 다운로드는 unit test 범위가 아닙니다.
 
-## 3. 데이터
+## 3. 데이터와 BPE
 
 | 항목 | 내용 |
 | --- | --- |
-| 원본 데이터 | NSMC |
+| 원본 데이터 | NAVER Sentiment Movie Corpus(NSMC) |
 | 원본 경로 | `data/ratings_train.txt`, `data/ratings_test.txt` |
-| 사전 학습 데이터 | `data/nsmc_lm_train.txt`, `data/nsmc_lm_val.txt` |
-| 미세 조정 데이터 | `data/nsmc_sentiment_train.jsonl`, `data/nsmc_sentiment_val.jsonl`, `data/nsmc_sentiment_test.jsonl` |
-| 전처리 방식 | 빈 리뷰 제거, 공백 정리, train/validation 분리 |
-| 사용한 데이터 크기 | Smoke / Light / Basic 중 선택 |
-
----
-
-## 4. BPE
-
-| 항목 | 내용 |
-| --- | --- |
-| 구현 파일 | `src/bpe.py` |
+| language-modeling data | `data/nsmc_lm_train.txt`, `data/nsmc_lm_val.txt` |
+| sentiment data | `data/nsmc_sentiment_train.jsonl`, `data/nsmc_sentiment_val.jsonl`, `data/nsmc_sentiment_test.jsonl` |
 | BPE 방식 | UTF-8 byte-level BPE |
-| 특수 토큰 ID | `<pad>=0`, `<unk>=1`, `<bos>=2`, `<eos>=3` |
-| byte token ID 범위 | 4~259 |
-| vocab_size | (예: 3000) |
-| 학습 corpus 크기 | (예: `corpus[:1_500_000]`) |
-| 어휘 학습 시간 | (예: Colab CPU Basic 설정 35분) |
-| vocabulary 저장 경로 | (예: `data/nsmc_bpe_vocab_3000.json`) |
-| 인코딩/디코딩 복원 예시 | (예: `decode(encode("이 영화는 좋았다")) == 원문`) |
+| 특수 token id | `<pad>=0`, `<unk>=1`, `<bos>=2`, `<eos>=3` |
+| byte token id 범위 | 4–259 |
+| historical vocabulary | 3,000 |
+| historical training corpus | 1,500,000 chars 설정; 실제 train chars 1,379,486 |
+| tokenizer artifact mode | 기존 tokenizer artifact load |
+| 독립 vocabulary 학습 시간 | 별도 보존되지 않음 |
 
----
+`tests/test_bpe.py`는 UTF-8 encode/decode, merge, special token, save/load round trip을 검증합니다.
 
-## 5. 모델 구조
+## 4. 모델 구조
 
-| 항목 | 내용 |
+```text
+token ids
+→ token embedding + position embedding
+→ 2 x TransformerBlock
+   → pre-LayerNorm
+   → causal MultiHeadAttention
+   → residual connection
+   → pre-LayerNorm
+   → GELU FeedForward
+   → residual connection
+→ final LayerNorm
+→ vocabulary projection
+```
+
+Historical experiment config:
+
+| 항목 | 값 |
+| --- | ---: |
+| vocab_size | 3,000 |
+| context_length | 128 |
+| emb_dim | 128 |
+| n_heads | 4 |
+| n_layers | 2 |
+| drop_rate | 0.1 |
+| qkv_bias | false |
+| parameter count | 1,180,416 (동일 config로 현재 model에서 계산) |
+
+## 5. Historical pretraining result — commit `4fe533e`
+
+이 절은 새로 재실행한 결과가 아니라 commit `4fe533e`의 `outputs/batch_size_experiment_20260603_170551`에 저장된 수치를 전사한 것입니다.
+
+| 항목 | 값 |
 | --- | --- |
-| 구현 파일 | `src/model.py` |
-| 전체 구조 | InputEmbedding -> N x TransformerBlock -> LayerNorm -> LM head |
-| vocab_size | (예: 3000) |
-| context_length | (예: 128) |
-| emb_dim | (예: 192) |
-| n_heads | (예: 4) |
-| n_layers | (예: 4) |
-| drop_rate | (예: 0.1) |
-| qkv_bias | True / False |
-| 총 파라미터 수 | (계산식 포함) |
+| seed | 42 |
+| epochs | 10 |
+| corpus size | 1,500,000 chars |
+| learning rate | `3e-4` |
+| weight decay | 0.1 |
+| device | CUDA |
+| train / validation / test token | 1,130,028 / 98,809 / 1,488,183 |
 
----
+| Batch | Best epoch | Final train loss | Best val loss | Test loss | Test PPL | Test top-1 / top-3 / top-5 | Total time |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4 | 10 | 3.9372 | 4.0773 | 4.0833 | 59.3438 | 0.2272 / 0.3745 / 0.4476 | 714.12 s |
+| 8 | 10 | 4.0354 | 4.1646 | 4.1730 | 64.9118 | 0.2178 / 0.3618 / 0.4344 | 451.79 s |
+| 16 | 10 | 4.1134 | 4.2240 | 4.2336 | 68.9680 | 0.2131 / 0.3555 / 0.4266 | 312.58 s |
 
-## 6. 사전 학습
+해석:
 
-### 6.1 하이퍼파라미터
+- 이 설정에서는 batch 4가 가장 낮은 validation/test loss와 가장 높은 top-k accuracy를 기록했습니다.
+- batch 16은 batch 4보다 총 시간이 약 56% 짧았지만 test perplexity는 더 높았습니다.
+- 세 조건 모두 best epoch가 10이므로 더 긴 학습에서 추세가 유지되는지는 이 실험만으로 알 수 없습니다.
+- 생성 sample에는 어색한 문장과 replacement character가 있어 small byte-level model의 품질 한계가 드러납니다.
 
-| 구분 | 항목 | 값 |
-| --- | --- | --- |
-| 모델 | vocab_size |  |
-| 모델 | context_length |  |
-| 모델 | emb_dim |  |
-| 모델 | n_heads |  |
-| 모델 | n_layers |  |
-| 학습 | batch_size |  |
-| 학습 | num_epochs |  |
-| 학습 | eval_freq, eval_iter |  |
-| 최적화 | lr, weight_decay |  |
+원본 근거:
 
-### 6.2 결과
+- `run_config.json`
+- `tables/summary_by_batch_size.md`
+- `tables/training_time_summary.md`
+- `tables/sample_generation_results.md`
+- batch별 metrics JSON과 loss/dashboard images
 
-| 항목 | 내용 |
+## 6. Sentiment fine-tuning status
+
+| 항목 | 상태 |
 | --- | --- |
-| train loss | epoch별 표 또는 요약 |
-| validation loss | epoch별 표 또는 요약 |
-| 손실 그래프 | 그래프 또는 파일 경로 |
-| 생성 샘플 | 같은 시작 문맥으로 epoch별 비교 |
-| checkpoint 경로 | (예: `checkpoints/ckpt_epoch_5.pt`) |
+| NSMC JSONL dataset | Implemented |
+| GPT backbone + classifier head | Implemented |
+| epoch train/evaluation utilities | Implemented |
+| unit tests | Implemented |
+| historical validation/test accuracy | artifact가 보존되지 않아 미기재 |
+| historical error examples | artifact가 보존되지 않아 미기재 |
 
----
+따라서 지원 자료에는 fine-tuning **구현과 테스트 경험**만 사용하고, 정확도나 성능 우위를 주장하지 않습니다.
 
-## 7. 미세 조정
+## 7. 실행 환경과 재현 경계
 
-| 항목 | 내용 |
+Current unit-test environment:
+
+| 항목 | 값 |
 | --- | --- |
-| 구현 파일 | `src/finetune.py` |
-| 과제 | NSMC 리뷰 긍정/부정 분류 |
-| 데이터 포맷 | JSONL, `text`, `label` |
-| max_length | (예: 128) |
-| batch_size | (예: 16) |
-| backbone learning rate |  |
-| classifier learning rate |  |
-| validation loss / accuracy |  |
-| test loss / accuracy |  |
-| 오류 예시 | 틀린 리뷰 예시와 추정 원인 |
+| OS | Windows |
+| Python | 3.11.15 |
+| PyTorch | 2.13.0+cpu |
+| NumPy | 2.4.6 |
+| Matplotlib | 3.11.0 |
+| CUDA | unavailable |
 
----
+Historical pretraining은 CUDA 환경에서 수행됐습니다. 현재 CPU unit test는 모듈 동작과 작은 tensor 경계를 재현하지만 historical 10-epoch training result를 재생산하지 않습니다.
 
-## 8. 실험 환경
+## 8. 한계와 다음 검증
 
-| 항목 | 내용 |
-| --- | --- |
-| Python | (예: Python 3.11) |
-| PyTorch | (예: PyTorch 2.x) |
-| 실행 환경 | Colab GPU / Colab CPU / 로컬 |
-| GPU/CPU 정보 |  |
-| 총 학습 소요 시간 |  |
-
----
-
-## 9. 고찰
-
-- 어려웠던 점
-- 한국어 byte-level BPE 구현에서 조심한 점
-- loss가 줄어든 이유 또는 줄어들지 않은 이유
-- 과적합·과소적합 여부
-- 하이퍼파라미터 변경 시도와 결과
-- 다음에 개선하고 싶은 점
+- 한 dataset/config family와 seed 42의 교육용 실험입니다.
+- raw checkpoint는 저장소에 포함되지 않았습니다.
+- historical artifact와 current unit test를 같은 실행으로 표현하지 않습니다.
+- sentiment accuracy를 보완하려면 고정 split·seed·checkpoint와 함께 새 실험을 실행하고 artifact를 저장해야 합니다.
+- 현재 저장소에는 팀이 합의한 별도 open-source `LICENSE`가 없습니다.

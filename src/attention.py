@@ -29,7 +29,7 @@ class MultiHeadAttention(nn.Module):
         self.d_model = d_model
         self.n_heads = n_heads
         self.head_dim = d_model // n_heads
-        # TODO: qkv projection, output projection, dropout을 정의하세요.
+        # Query/key/value projection과 output projection을 같은 model 차원에 둡니다.
         self.W_query = nn.Linear(d_model, d_model, bias=qkv_bias)
         self.W_key = nn.Linear(d_model, d_model, bias=qkv_bias)
         self.W_value = nn.Linear(d_model, d_model, bias=qkv_bias)
@@ -42,8 +42,6 @@ class MultiHeadAttention(nn.Module):
                        diagonal=1)
         )
 
-        # raise NotImplementedError("MultiHeadAttention.__init__을 구현하세요.")
-
     def forward(
         self,
         x: torch.Tensor,
@@ -51,7 +49,7 @@ class MultiHeadAttention(nn.Module):
         return_attention_weights: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
-        TODO: multi-head attention forward를 구현합니다.
+        causal mask를 적용할 수 있는 multi-head attention을 계산합니다.
 
         Args:
             x: (batch_size, seq_len, d_model)
@@ -89,4 +87,3 @@ class MultiHeadAttention(nn.Module):
             return context_vec, attn_weights
         else:
             return context_vec
-        # raise NotImplementedError("MultiHeadAttention.forward를 구현하세요.")
